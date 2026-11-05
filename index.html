@@ -1,0 +1,2247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FITS 광도곡선 실험실</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@500;600;700&family=Nanum+Gothic+Coding&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: a notebook of numbered steps down a left rail; each step = explanation, controls, then its output, like a Colab cell. */
+  --paper: #eef1f5;
+  --panel: #ffffff;
+  --ink: #142030;
+  --muted: #566477;
+  --rule: #d5dbe4;
+  --accent: #2a55c9;
+  --accent-soft: #e2e9fb;
+  --signal: #c03a26;
+  --out: #f5f7fa;
+  --dot: #8995a7;
+  --ok: #2c7a4b;
+  --warn: #9a6210;
+  --bad: #b42318;
+  --font-display: 'IBM Plex Sans KR', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  --font-body: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Nanum Gothic Coding', 'D2Coding', Consolas, ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e131a; --panel: #151c26; --ink: #e5eaf1; --muted: #98a4b4; --rule: #2a3443;
+    --accent: #84a6ff; --accent-soft: #1d2a47; --signal: #ff7d66; --out: #111821; --dot: #6f7c8f;
+    --ok: #63c48d; --warn: #e2b25c; --bad: #ff6c5f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e131a; --panel: #151c26; --ink: #e5eaf1; --muted: #98a4b4; --rule: #2a3443;
+  --accent: #84a6ff; --accent-soft: #1d2a47; --signal: #ff7d66; --out: #111821; --dot: #6f7c8f;
+  --ok: #63c48d; --warn: #e2b25c; --bad: #ff6c5f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.65 var(--font-body); }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 32px 20px 64px; display: grid; gap: 28px; }
+.masthead { display: grid; gap: 14px; }
+.masthead .eyebrow { font: 500 12px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.masthead h1 { font-size: clamp(26px, 4vw, 36px); font-weight: 700; letter-spacing: -.01em; }
+.masthead p { margin: 0; max-width: 68ch; color: var(--muted); }
+.privacy { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ok); }
+.glossary { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px 22px; margin: 0; padding: 16px 18px; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; }
+.glossary div { display: grid; gap: 2px; }
+.glossary dt { font: 600 14px/1.3 var(--font-display); }
+.glossary dd { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.steps { display: grid; gap: 0; }
+.step { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; position: relative; padding-bottom: 22px; }
+.step::before { content: ""; position: absolute; left: 21px; top: 44px; bottom: 0; width: 2px; background: var(--rule); }
+.step:last-child::before { display: none; }
+.num { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font: 600 17px/1 var(--font-mono); background: var(--panel); border: 2px solid var(--rule); color: var(--muted); position: relative; z-index: 1; }
+.step[data-state="ready"] .num, .step[data-state="running"] .num { border-color: var(--accent); color: var(--accent); }
+.step[data-state="done"] .num { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.step[data-state="locked"] .card { opacity: .78; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px 0; flex-wrap: wrap; }
+.card-head h2 { font-size: 20px; font-weight: 600; }
+.pill { font: 500 12px/1 var(--font-mono); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+.step[data-state="ready"] .pill { color: var(--accent); border-color: var(--accent); }
+.step[data-state="running"] .pill { color: var(--panel); background: var(--accent); border-color: var(--accent); }
+.step[data-state="done"] .pill { color: var(--ok); border-color: var(--ok); }
+.explain { padding: 8px 18px 4px; max-width: 74ch; }
+.explain p { margin: 6px 0; }
+.explain .note { font-size: 13.5px; color: var(--muted); }
+.explain-grid { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 16px; align-items: center; padding: 8px 18px 4px; }
+.explain-grid .explain { padding: 0; }
+.controls { border: 0; margin: 0; padding: 12px 18px 14px; display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; }
+.controls[disabled] { opacity: .55; }
+.field { display: grid; gap: 4px; }
+.field > span, .label { font-size: 12.5px; color: var(--muted); }
+.field input[type="number"], .field input[type="text"], .field select, textarea { font: 14px/1.4 var(--font-mono); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 7px 9px; min-width: 0; }
+.field input[type="number"] { width: 110px; }
+.field input.wide { width: 190px; }
+textarea { width: 100%; resize: vertical; }
+.check { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; padding-bottom: 6px; }
+.seg-group { display: inline-flex; border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; }
+.seg-group label, .seg-group button { padding: 8px 13px; font: 500 14px/1.2 var(--font-body); cursor: pointer; background: var(--panel); color: var(--ink); border: 0; border-right: 1px solid var(--rule); display: inline-flex; gap: 6px; align-items: center; }
+.seg-group > :last-child { border-right: 0; }
+.seg-group input { accent-color: var(--accent); }
+.seg-group button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.btn { font: 600 14px/1.2 var(--font-body); padding: 9px 15px; border-radius: 9px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.ghost { border-style: dashed; }
+.btn:disabled { cursor: not-allowed; opacity: .5; }
+.btn:focus-visible, .seg-group label:focus-within, .seg-group button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .drop:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.drop { width: 100%; border: 2px dashed var(--rule); border-radius: 12px; padding: 16px; display: grid; gap: 10px; justify-items: start; background: var(--out); }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop p { margin: 0; color: var(--muted); font-size: 14px; }
+.btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.output { border-top: 1px solid var(--rule); background: var(--out); padding: 14px 18px 16px; display: grid; gap: 14px; }
+.output .placeholder { margin: 0; color: var(--muted); font-size: 13.5px; }
+.output .placeholder::before { content: "결과 ▸ "; font-family: var(--font-mono); }
+.log { margin: 0; font: 13px/1.6 var(--font-mono); white-space: pre-wrap; word-break: break-word; }
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.kv div { background: var(--panel); border: 1px solid var(--rule); border-radius: 9px; padding: 9px 11px; display: grid; gap: 2px; }
+.kv b { font: 600 18px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.kv span { font-size: 12px; color: var(--muted); }
+.msgs { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.msgs li { font-size: 13.5px; padding: 7px 10px 7px 12px; border-left: 3px solid var(--rule); background: var(--panel); border-radius: 0 7px 7px 0; }
+.msgs li.warn { border-color: var(--warn); }
+.msgs li.bad { border-color: var(--bad); }
+.msgs li.ok { border-color: var(--ok); }
+.tag { font: 600 11.5px/1 var(--font-mono); padding: 4px 7px; border-radius: 6px; display: inline-block; }
+.tag.ok { color: var(--ok); border: 1px solid var(--ok); }
+.tag.warn { color: var(--warn); border: 1px solid var(--warn); }
+.tag.bad { color: var(--bad); border: 1px solid var(--bad); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+th.n { text-align: right; }
+tr.is-target td { background: color-mix(in srgb, var(--signal) 10%, transparent); }
+tr.is-comp td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.mini-btn { font: 500 12px/1 var(--font-body); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer; }
+.viewer { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; }
+.frame { position: relative; line-height: 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--rule); background: #000; }
+.frame canvas { width: 100%; height: auto; display: block; image-rendering: auto; }
+.frame svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.frame.zoom canvas { image-rendering: pixelated; }
+.frame .hint { position: absolute; left: 8px; bottom: 8px; font: 12px/1.3 var(--font-body); color: #fff; background: rgba(0,0,0,.55); padding: 4px 7px; border-radius: 6px; pointer-events: none; }
+.mk-other { fill: none; stroke: #9fb3ff; stroke-opacity: .55; stroke-width: 1; }
+.mk-target { fill: none; stroke: #ff6a52; stroke-width: 2; }
+.mk-comp { fill: none; stroke: #7fc3ff; stroke-width: 2; }
+.mk-ann { fill: none; stroke: #ffd25a; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.mk-label { font: 600 11px var(--font-mono); paint-order: stroke; stroke: #000; stroke-width: 3px; }
+.mk-label.t { fill: #ff8a76; }
+.mk-label.c { fill: #9fd2ff; }
+.mk-label.o { fill: #d6defa; font-weight: 500; }
+.mk-zoomrect { fill: none; stroke: #ffd25a; stroke-width: 1.5; }
+.selbox { display: grid; gap: 10px; align-content: start; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 12.5px/1.2 var(--font-mono); padding: 5px 8px; border-radius: 7px; border: 1px solid var(--rule); background: var(--panel); }
+.chip.t { border-color: var(--signal); color: var(--signal); }
+.chip.c { border-color: var(--accent); color: var(--accent); }
+progress { width: 100%; height: 10px; accent-color: var(--accent); }
+.chart { position: relative; background: #ffffff; border: 1px solid var(--rule); border-radius: 8px; padding: 4px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.c-grid { stroke: var(--rule); stroke-width: 1; }
+.c-frame { fill: none; stroke: var(--rule); }
+.c-tick { fill: var(--muted); font: 11px var(--font-mono); }
+.c-axis { fill: var(--muted); font: 12px var(--font-body); }
+.c-dot { fill: var(--dot); fill-opacity: .55; }
+.c-bin { fill: var(--accent); stroke: var(--panel); stroke-width: 1.5; }
+.c-err { stroke: var(--accent); stroke-width: 1.4; }
+.c-line { fill: none; stroke: var(--accent); stroke-width: 2.2; }
+.c-thin { fill: none; stroke: var(--accent); stroke-width: 1.4; }
+.c-expect { fill: none; stroke: var(--signal); stroke-width: 1.6; stroke-dasharray: 6 4; }
+.c-vline { stroke: var(--signal); stroke-width: 1; stroke-dasharray: 2 3; }
+.c-vlabel { fill: var(--signal); font: 11px var(--font-body); }
+.c-mark { fill: var(--signal); }
+.c-hl { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin: 6px 4px 2px; padding: 0; font-size: 12.5px; color: var(--muted); }
+.legend li { display: inline-flex; gap: 7px; align-items: center; }
+.key { width: 18px; height: 10px; display: inline-block; position: relative; }
+.key.dot::after { content: ""; position: absolute; left: 5px; top: 1px; width: 8px; height: 8px; border-radius: 50%; background: var(--dot); opacity: .7; }
+.key.bin::after { content: ""; position: absolute; left: 5px; top: 1px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.key.line::after { content: ""; position: absolute; left: 0; top: 4px; width: 18px; height: 2.4px; background: var(--accent); }
+.key.expect::after { content: ""; position: absolute; left: 0; top: 4px; width: 18px; border-top: 2px dashed var(--signal); }
+.key.vline::after { content: ""; position: absolute; left: 8px; top: -2px; height: 14px; border-left: 1.5px dotted var(--signal); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--panel); font: 12px/1.4 var(--font-mono); padding: 5px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -120%); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.minis { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.minis .chart h3 { font-size: 12.5px; display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.verdict { display: grid; gap: 6px; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--rule); background: var(--panel); border-left: 5px solid var(--muted); }
+.verdict.ok { border-left-color: var(--ok); }
+.verdict.warn { border-left-color: var(--warn); }
+.verdict.bad { border-left-color: var(--bad); }
+.verdict b.big { font: 600 24px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.diagram { width: 100%; max-width: 190px; height: auto; }
+footer { color: var(--muted); font-size: 13px; max-width: 72ch; }
+@media (max-width: 760px) {
+  .viewer { grid-template-columns: 1fr; }
+  .explain-grid { grid-template-columns: 1fr; }
+  .step { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; }
+  .num { width: 34px; height: 34px; font-size: 14px; }
+  .step::before { left: 16px; top: 34px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <span class="eyebrow">차등측광 · 광도곡선 · 식현상</span>
+    <h1>FITS 광도곡선 실험실</h1>
+    <p>같은 별을 밤새 여러 번 찍은 FITS 사진에서 별의 밝기 변화를 직접 재 봅니다. 1단계부터 차례로 실행하면 앞 단계의 결과를 받아 다음 단계가 열립니다. 각 단계마다 무엇을 왜 하는지 적어 두었습니다.</p>
+    <span class="privacy">● 사진 파일은 이 브라우저 안에서만 읽히고 어디에도 올라가지 않습니다.</span>
+    <dl class="glossary">
+      <div><dt>FITS 파일</dt><dd>천문 사진 형식. 사진과 함께 촬영 시각·노출 시간·필터 같은 정보(헤더)가 들어 있습니다.</dd></div>
+      <div><dt>등급과 mmag</dt><dd>별의 밝기를 나타내는 숫자로, 작을수록 밝습니다. 1 mmag = 0.001등급 ≈ 밝기 0.09% 차이.</dd></div>
+      <div><dt>구경측광</dt><dd>별 둘레에 원(측광 원)을 그리고 그 안의 빛을 모두 더해 밝기를 재는 방법.</dd></div>
+      <div><dt>배경환</dt><dd>측광 원 바깥의 도넛 모양 영역. 밤하늘 배경 밝기를 재서 별빛에서 빼 줍니다.</dd></div>
+      <div><dt>비교성</dt><dd>대상 근처에서 밝기가 변하지 않는 별. 대상과 함께 재서 구름·대기 영향을 지웁니다.</dd></div>
+      <div><dt>차등 등급</dt><dd>대상 등급 − 비교성 등급. 대상 자체의 밝기 변화만 남깁니다.</dd></div>
+      <div><dt>광도곡선</dt><dd>가로축 시간, 세로축 밝기로 그린 그래프. 이 실험의 결과물입니다.</dd></div>
+      <div><dt>식현상</dt><dd>행성이 별 앞을 지나가며 별빛을 1% 안팎 가리는 현상. 몇 시간 동안 얕게 어두워집니다.</dd></div>
+    </dl>
+  </header>
+
+  <main class="steps" id="steps">
+
+    <section class="step" id="s1" data-state="ready" aria-labelledby="h1t">
+      <div class="num">1</div>
+      <div class="card">
+        <div class="card-head"><h2 id="h1t">사진 불러오기</h2><span class="pill">실행 전</span></div>
+        <div class="explain">
+          <p>같은 대상을 <b>같은 필터로, 시간 간격을 두고 여러 번</b> 찍은 FITS 파일이 필요합니다. 필터당 한 장이면 그 순간의 밝기만 알 수 있어서 광도곡선이 나오지 않습니다.</p>
+          <p class="note">bias·dark·flat 보정(전처리)을 끝낸 파일을 쓰세요. 폴더째 고르면 그 안의 .fit / .fits / .fts 파일을 모두 읽습니다. 구글 드라이브 데스크톱 앱을 쓰고 있다면 드라이브 폴더에서 바로 고르면 됩니다. 사진이 없으면 예제 데이터로 먼저 해 볼 수 있습니다.</p>
+        </div>
+        <fieldset class="controls" id="c1">
+          <div class="field"><span>무엇을 관측했나요?</span>
+            <div class="seg-group" role="radiogroup" aria-label="관측 대상 종류">
+              <label><input type="radio" name="mode" value="variable" checked> 변광성</label>
+              <label><input type="radio" name="mode" value="transit"> 외계행성 식현상</label>
+            </div>
+          </div>
+          <div class="drop" id="drop" tabindex="0" aria-label="FITS 파일을 끌어다 놓는 곳">
+            <p>FITS 파일이나 폴더를 여기에 끌어다 놓거나 아래 버튼으로 고르세요.</p>
+            <div class="btns">
+              <button class="btn primary" type="button" id="pickFiles">파일 고르기</button>
+              <button class="btn" type="button" id="pickFolder">폴더째 고르기</button>
+              <button class="btn ghost" type="button" id="exampleBtn">예제 데이터로 해 보기</button>
+            </div>
+            <input type="file" id="fileInput" multiple accept=".fit,.fits,.fts,.FIT,.FITS,.FTS" hidden>
+            <input type="file" id="folderInput" webkitdirectory multiple hidden>
+          </div>
+        </fieldset>
+        <div class="output" id="o1"><p class="placeholder">아직 불러온 사진이 없습니다.</p></div>
+      </div>
+    </section>
+
+    <section class="step" id="s2" data-state="locked" aria-labelledby="h2t">
+      <div class="num">2</div>
+      <div class="card">
+        <div class="card-head"><h2 id="h2t">첫 사진에서 별 찾기</h2><span class="pill">잠김</span></div>
+        <div class="explain">
+          <p>가장 먼저 찍은 사진을 열어 별을 자동으로 찾습니다. 사진 전체의 밤하늘 밝기(배경)와 그 흔들림(σ, 표준편차)을 잰 뒤, <b>배경보다 σ의 몇 배 이상 밝은 점</b>을 별로 봅니다.</p>
+          <p class="note">별이 너무 적게 잡히면 탐지 기준을 낮추고(예: 5σ), 가짜 별이 많으면 높이세요. 찾은 별에는 밝은 순서대로 번호가 붙습니다. 0번은 "가장 밝은 별"일 뿐 관측 대상이라는 뜻이 아닙니다.</p>
+        </div>
+        <fieldset class="controls" id="c2" disabled>
+          <label class="field"><span>탐지 기준 (σ의 몇 배)</span><input type="number" id="detSigma" value="8" min="3" max="50" step="0.5"></label>
+          <label class="field"><span>별 크기 FWHM (픽셀)</span><input type="number" id="detFwhm" value="6" min="2" max="30" step="0.5"></label>
+          <button class="btn primary" type="button" id="run2" data-run>별 찾기</button>
+        </fieldset>
+        <div class="output" id="o2"><p class="placeholder">1단계를 마치면 실행할 수 있습니다.</p></div>
+      </div>
+    </section>
+
+    <section class="step" id="s3" data-state="locked" aria-labelledby="h3t">
+      <div class="num">3</div>
+      <div class="card">
+        <div class="card-head"><h2 id="h3t">대상과 비교성 고르기</h2><span class="pill">잠김</span></div>
+        <div class="explain">
+          <p><b>차등측광</b>은 대상 별을 근처 비교성들과 같은 사진에서 함께 재는 방법입니다. 구름이나 대기 때문에 밝기가 변하면 대상과 비교성이 똑같이 영향을 받으니, 둘의 차이만 보면 대상 자체의 변화만 남습니다.</p>
+          <p class="note">왼쪽 큰 그림을 누르면 오른쪽에 확대됩니다. 확대 그림에서 별을 눌러 고르세요. 좋은 비교성은 대상과 밝기가 비슷하고, 포화되지 않았고, 바로 옆에 다른 별이 붙어 있지 않은 별입니다. 변광성은 3~5개, 식현상은 5개 이상을 권합니다.</p>
+        </div>
+        <fieldset class="controls" id="c3" disabled>
+          <div class="field"><span>확대 그림에서 누르면</span>
+            <div class="seg-group" role="group" aria-label="선택 모드">
+              <button type="button" id="modeTarget" aria-pressed="true">대상으로 지정</button>
+              <button type="button" id="modeComp" aria-pressed="false">비교성 추가/빼기</button>
+            </div>
+          </div>
+          <label class="field"><span>추천 개수</span><input type="number" id="suggestN" value="5" min="1" max="15" step="1"></label>
+          <button class="btn" type="button" id="suggestBtn">비교성 자동 추천</button>
+          <button class="btn ghost" type="button" id="clearSel">선택 지우기</button>
+          <button class="btn primary" type="button" id="run3" data-run>이 선택으로 확정</button>
+        </fieldset>
+        <div class="output" id="o3"><p class="placeholder">2단계를 마치면 별을 고를 수 있습니다.</p></div>
+      </div>
+    </section>
+
+    <section class="step" id="s4" data-state="locked" aria-labelledby="h4t">
+      <div class="num">4</div>
+      <div class="card">
+        <div class="card-head"><h2 id="h4t">시야 정렬과 구경측광</h2><span class="pill">잠김</span></div>
+        <div class="explain-grid">
+          <div class="explain">
+            <p>모든 사진에서 대상과 비교성의 밝기를 잽니다. 별 둘레의 <b>측광 원</b> 안 빛을 다 더하고, 바깥 <b>배경환</b>에서 잰 밤하늘 밝기만큼 빼면 순수한 별빛이 남습니다. 측광 원 크기는 6~24픽셀 여러 가지로 한꺼번에 재 두고, 5단계에서 가장 좋은 크기를 고릅니다.</p>
+            <p class="note">밤새 찍다 보면 망원경 추적이 조금씩 밀리거나 시야가 돌아갑니다. 측광 원을 처음 자리에 고정하면 별이 원 밖으로 빠져나가 어두워진 것처럼 잘못 잽니다. <b>시야 정렬</b>을 켜면 사진마다 밝은 별 여러 개의 위치를 첫 사진과 비교해 이동량과 회전각을 계산하고, 측광 원을 그만큼 옮깁니다.</p>
+          </div>
+          <svg class="diagram" viewBox="0 0 190 190" role="img" aria-label="측광 원과 배경환 그림">
+            <defs><radialGradient id="starG"><stop offset="0" stop-color="#fff8d6"/><stop offset=".35" stop-color="#ffd36b" stop-opacity=".85"/><stop offset="1" stop-color="#ffd36b" stop-opacity="0"/></radialGradient></defs>
+            <rect width="190" height="190" rx="12" fill="#0b1020"/>
+            <circle cx="95" cy="95" r="30" fill="url(#starG)"/>
+            <circle cx="95" cy="95" r="36" fill="none" stroke="#ff6a52" stroke-width="2.5"/>
+            <circle cx="95" cy="95" r="52" fill="none" stroke="#ffd25a" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <circle cx="95" cy="95" r="76" fill="none" stroke="#ffd25a" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="95" y="20" text-anchor="middle" fill="#ffd25a" font-size="12" font-family="Noto Sans KR, sans-serif">배경환</text>
+            <text x="95" y="146" text-anchor="middle" fill="#ff8a76" font-size="12" font-family="Noto Sans KR, sans-serif">측광 원</text>
+          </svg>
+        </div>
+        <fieldset class="controls" id="c4" disabled>
+          <label class="field"><span>카메라 gain (e⁻/ADU, 오차 계산용)</span><input type="number" id="gain" value="1" min="0.01" step="0.01"></label>
+          <label class="check"><input type="checkbox" id="alignOn" checked> 시야 정렬 (이동·회전 따라가기)</label>
+          <button class="btn primary" type="button" id="run4" data-run>측광 시작</button>
+          <button class="btn" type="button" id="stop4" disabled>멈추기</button>
+        </fieldset>
+        <div class="output" id="o4"><p class="placeholder">3단계에서 대상과 비교성을 확정하면 실행할 수 있습니다.</p></div>
+      </div>
+    </section>
+
+    <section class="step" id="s5" data-state="locked" aria-labelledby="h5t">
+      <div class="num">5</div>
+      <div class="card">
+        <div class="card-head"><h2 id="h5t">비교성 점검과 측광 원 크기 고르기</h2><span class="pill">잠김</span></div>
+        <div class="explain">
+          <p>비교성도 별이라 그중 하나가 알고 보니 변광성이거나, 옆 별과 빛이 섞여 흔들릴 수 있습니다. 각 비교성을 <b>나머지 비교성들의 중앙값</b>과 비교해 시간에 따라 얼마나 흔들리는지(표준편차) 재고, 유난히 흔들리는 별은 자동으로 뺍니다. 체크를 바꿔 직접 넣고 뺄 수도 있습니다.</p>
+          <p class="note">측광 원 크기는 비교성끼리 비교했을 때 10분 묶음의 흩어짐이 가장 작은 크기를 추천합니다. 원이 너무 작으면 별빛이 빠져나가고, 너무 크면 배경 잡음과 이웃 별빛이 섞입니다. 대상의 곡선이 아니라 비교성끼리로 고르기 때문에, 원하는 결과에 맞춰 고르는 실수를 막아 줍니다.</p>
+        </div>
+        <fieldset class="controls" id="c5" disabled>
+          <button class="btn primary" type="button" id="run5" data-run>점검 실행</button>
+        </fieldset>
+        <div class="output" id="o5"><p class="placeholder">4단계 측광이 끝나면 실행할 수 있습니다.</p></div>
+      </div>
+    </section>
+
+    <section class="step" id="s6" data-state="locked" aria-labelledby="h6t">
+      <div class="num">6</div>
+      <div class="card">
+        <div class="card-head"><h2 id="h6t">광도곡선 그리기</h2><span class="pill">잠김</span></div>
+        <div class="explain">
+          <p>사진마다 <b>차등 등급(대상 − 비교성)</b>을 계산해 시간 순서로 그립니다. 그래프는 위쪽이 밝은 쪽입니다. 시간이 가까운 사진들을 묶어 평균을 내면(시간 묶음) 점 개수는 줄지만 점 하나의 정밀도가 올라갑니다.</p>
+          <p class="note">세로축은 두 가지로 볼 수 있습니다. <b>정규화 상대 플럭스</b>는 대상 밝기 ÷ 비교성 밝기를 평소 값이 1.00이 되게 맞춘 것으로, 0.99면 평소보다 1% 어두워졌다는 뜻입니다. <b>밝기 변화(mmag)</b>는 같은 내용을 등급 단위로 나타낸 것입니다(1% ≈ 10.9 mmag).</p>
+          <p class="note">별 위치가 크게 어긋났거나 오차가 유난히 큰 사진은 빼고 그립니다. 추세 제거는 대기질량(별빛이 지나온 대기의 두께)에 따른 완만한 기울기를 직선으로 빼는 기능인데, 관측 대부분이 식 도중이면 식 신호까지 지울 수 있습니다. 식현상은 7단계 피팅에서 추세와 식을 함께 맞추는 쪽이 안전합니다.</p>
+        </div>
+        <fieldset class="controls" id="c6" disabled>
+          <label class="field"><span>시간 묶음</span>
+            <select id="binMin">
+              <option value="0">묶지 않음</option><option value="2">2분</option><option value="5">5분</option><option value="10">10분</option><option value="15">15분</option><option value="20">20분</option>
+            </select></label>
+          <label class="check"><input type="checkbox" id="outlierOn" checked> 이상한 사진 빼기</label>
+          <label class="check"><input type="checkbox" id="detrendOn"> 추세 제거</label>
+          <label class="field"><span>추세 기준</span><select id="detrendBy"><option value="airmass">대기질량</option><option value="time">시간</option></select></label>
+          <label class="field"><span>세로축</span><select id="yUnit"><option value="flux">정규화 상대 플럭스 (평소 밝기 = 1)</option><option value="mmag">밝기 변화 (mmag)</option></select></label>
+          <button class="btn primary" type="button" id="run6" data-run>광도곡선 그리기</button>
+        </fieldset>
+        <div class="output" id="o6"><p class="placeholder">5단계 점검이 끝나면 그릴 수 있습니다.</p></div>
+      </div>
+    </section>
+
+    <section class="step" id="s7" data-state="locked" aria-labelledby="h7t">
+      <div class="num">7</div>
+      <div class="card">
+        <div class="card-head"><h2 id="h7t">식 곡선 피팅</h2><span class="pill">잠김</span></div>
+        <div class="explain">
+          <p>행성의 궤도 정보(기준 식 시각 T0와 공전 주기 P)로 이번 관측의 식 시각을 예보하고, <b>"완만한 추세 + 사다리꼴 모양의 식"</b>을 데이터에 동시에 맞춰 식 깊이를 숫자로 구합니다. 오차는 10분 묶음의 실제 흩어짐으로 계산해서 구름·시상 같은 느린 잡음까지 반영합니다.</p>
+          <p><b>주연감광</b>: 별 원반은 가장자리로 갈수록 어둡게 보입니다. 그래서 행성이 별 가운데를 지날 때 더 많은 빛을 가려, 식의 바닥이 평평하지 않고 <b>둥근 U자 곡선</b>이 됩니다. "주연감광 포함" 모델은 이 효과를 계산에 넣습니다. 행성과 별의 반지름 비(Rp/Rs), 행성이 별 중심에서 얼마나 비껴 지나가는지(충돌 계수 b, 0이면 정중앙), 주연감광 계수(u1, u2)가 필요합니다. u1, u2는 별의 온도와 필터에 따라 정해지는데, 필터를 고르면 태양과 비슷한 별(약 5800 K)의 대략값이 들어갑니다.</p>
+          <p class="note">결과 읽는 법: 깊이가 오차의 3배(3σ) 이상이고, 비교성을 하나씩 빼고 다시 맞춰도 비슷하게 나와야 믿을 만합니다. 비교성 하나에 따라 값이 크게 바뀌면, 원하는 값이 나오는 조합을 고르지 말고 "이 데이터로는 판단하기 어렵다"고 보는 것이 맞습니다. 변광성 관측이면 이 단계는 건너뛰어도 됩니다.</p>
+        </div>
+        <fieldset class="controls" id="c7" disabled>
+          <div class="field"><span>궤도 정보 불러오기</span>
+            <div class="btns"><button class="mini-btn" type="button" id="presetHat">HAT-P-1b</button><button class="mini-btn" type="button" id="presetEx">예제 행성</button></div>
+          </div>
+          <label class="field"><span>T0 (BJD_TDB)</span><input type="number" class="wide" id="fT0" value="2456288.492023" step="0.000001"></label>
+          <label class="field"><span>주기 P (일)</span><input type="number" id="fP" value="4.46529962" step="0.00000001"></label>
+          <label class="field"><span>식 길이 (시간)</span><input type="number" id="fDur" value="2.798" step="0.01"></label>
+          <label class="field"><span>식 모양</span><select id="fModel"><option value="ld">주연감광 포함 (곡선)</option><option value="trap">사다리꼴 (단순)</option></select></label>
+          <label class="field"><span>반지름 비 Rp/Rs</span><input type="number" id="fK" value="0.118" step="0.001" min="0.005" max="0.5"></label>
+          <label class="field"><span>충돌 계수 b</span><input type="number" id="fB" value="0.75" step="0.01" min="0" max="1.4"></label>
+          <label class="field"><span>주연감광 계수 기준</span><select id="fBand"><option value="B">B 필터</option><option value="V">V 필터</option><option value="R" selected>R 필터</option><option value="I">I 필터</option><option value="g">g 필터</option><option value="r">r 필터</option><option value="i">i 필터</option><option value="clear">필터 없음</option><option value="custom">직접 입력</option></select></label>
+          <label class="field"><span>주연감광 u1</span><input type="number" id="fU1" value="0.38" step="0.01"></label>
+          <label class="field"><span>주연감광 u2</span><input type="number" id="fU2" value="0.29" step="0.01"></label>
+          <label class="field"><span>들어가는 시간 (사다리꼴만, 시간)</span><input type="number" id="fIng" value="0.51" step="0.01"></label>
+          <label class="field"><span>예상 깊이 (사다리꼴만, mmag)</span><input type="number" id="fDepth" value="15" step="0.1"></label>
+          <label class="field"><span>대상 적경 RA</span><input type="text" class="wide" id="fRa" value="22h57m46.84s"></label>
+          <label class="field"><span>대상 적위 Dec</span><input type="text" class="wide" id="fDec" value="+38d40m29.8s"></label>
+          <label class="field"><span>함께 맞출 추세</span><select id="fTrend"><option value="airmass">대기질량</option><option value="time">시간</option><option value="none">없음</option></select></label>
+          <label class="check"><input type="checkbox" id="fFree"> 식 중앙 시각도 ±60분 안에서 찾기</label>
+          <button class="btn primary" type="button" id="run7" data-run>피팅 실행</button>
+        </fieldset>
+        <div class="output" id="o7"><p class="placeholder">6단계 광도곡선을 그리면 실행할 수 있습니다.</p></div>
+      </div>
+    </section>
+    <section class="step" id="s8" data-state="locked" aria-labelledby="h8t">
+      <div class="num">8</div>
+      <div class="card">
+        <div class="card-head"><h2 id="h8t">결과 정리: 표준편차와 CSV</h2><span class="pill">잠김</span></div>
+        <div class="explain">
+          <p><b>표준편차(σ)</b>는 값들이 평균에서 얼마나 흩어져 있는지를 나타내는 숫자입니다. σ = √( Σ(x − x̄)² ÷ (N − 1) ). 밝기가 변하지 않아야 하는 구간(식 밖)의 표준편차가 곧 이 관측의 <b>측정 정밀도</b>입니다.</p>
+          <p class="note">N장을 평균하면 흩어짐이 σ ÷ √N로 줄어듭니다(평균의 표준오차). 식 깊이를 이 값과 비교하면 신호가 잡음보다 몇 배 큰지(신호대잡음비) 알 수 있습니다. 7단계 피팅을 먼저 하면 식 안과 밖을 나눠 계산하고, 모델과 잔차(데이터 − 모델)도 CSV에 넣습니다. CSV는 엑셀에서 바로 열 수 있습니다.</p>
+        </div>
+        <fieldset class="controls" id="c8" disabled>
+          <button class="btn primary" type="button" id="run8" data-run>결과 정리</button>
+        </fieldset>
+        <div class="output" id="o8"><p class="placeholder">6단계 광도곡선을 그리면 실행할 수 있습니다.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>계산 방식은 함께 쓰는 Colab 노트북(시계열분석프로그램1)과 같습니다. 측광 원 안쪽 경계 픽셀은 5×5로 나눠 넓이를 계산하고, 배경은 3σ로 걸러낸 중앙값을 씁니다. 시각은 노출 중간 시각이며, 식 피팅에는 태양 중심 기준 시각(BJD_TDB, 오차 수 초)으로 바꿔 씁니다.</p>
+  </footer>
+</div>
+
+<script id="core">
+const Core = (() => {
+  'use strict';
+  const BLOCK = 2880;
+  const AU_LIGHT_S = 499.004784;
+  const DEG = Math.PI / 180;
+  const RADII = [6, 8, 10, 12, 14, 16, 18, 20, 24];
+  const ANN_GAP = 4;
+  const ANN_WIDTH = 6;
+  const IDENTITY = { ar: 1, ai: 0, tr: 0, ti: 0 };
+
+  // ---------- statistics ----------
+  function finite(a) { const o = []; for (const v of a) if (Number.isFinite(v)) o.push(v); return o; }
+  function median(a) {
+    const s = Float64Array.from(finite(a)).sort();
+    const n = s.length;
+    if (!n) return NaN;
+    return n % 2 ? s[(n - 1) >> 1] : 0.5 * (s[n / 2 - 1] + s[n / 2]);
+  }
+  function meanStd(a) {
+    let m = 0;
+    for (const v of a) m += v;
+    m /= a.length;
+    let s = 0;
+    for (const v of a) s += (v - m) * (v - m);
+    return [m, Math.sqrt(s / a.length)];
+  }
+  function clippedStats(values, sigma = 3, iters = 5) {
+    let v = finite(values);
+    if (!v.length) return { mean: NaN, median: NaN, std: NaN };
+    for (let it = 0; it < iters; it++) {
+      const med = median(v);
+      const sd = meanStd(v)[1];
+      const keep = v.filter(x => Math.abs(x - med) <= sigma * sd);
+      if (keep.length === v.length || keep.length < 3) break;
+      v = keep;
+    }
+    const [mean, std] = meanStd(v);
+    return { mean, median: median(v), std };
+  }
+  function stdOf(a) { const f = finite(a); return f.length > 1 ? meanStd(f)[1] : NaN; }
+  function p2p(a) {
+    const f = finite(a), d = [];
+    for (let i = 1; i < f.length; i++) d.push(f[i] - f[i - 1]);
+    return d.length > 1 ? stdOf(d) / Math.SQRT2 : NaN;
+  }
+  function solve(M, b) {
+    const n = b.length;
+    const A = M.map((r, i) => [...r, b[i]]);
+    for (let c = 0; c < n; c++) {
+      let p = c;
+      for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+      if (!(Math.abs(A[p][c]) > 1e-14)) return null;
+      [A[c], A[p]] = [A[p], A[c]];
+      for (let r = 0; r < n; r++) {
+        if (r === c) continue;
+        const f = A[r][c] / A[c][c];
+        if (f) for (let k = c; k <= n; k++) A[r][k] -= f * A[c][k];
+      }
+    }
+    return A.map((r, i) => r[n] / r[i]);
+  }
+  function invert(M) {
+    const n = M.length, cols = [];
+    for (let j = 0; j < n; j++) {
+      const col = solve(M, M.map((_, i) => (i === j ? 1 : 0)));
+      if (!col) return null;
+      cols.push(col);
+    }
+    return M.map((_, i) => cols.map(col => col[i]));
+  }
+  function lstsq(rows, y) {
+    const k = rows[0].length;
+    const AtA = Array.from({ length: k }, () => new Array(k).fill(0));
+    const Aty = new Array(k).fill(0);
+    rows.forEach((r, i) => {
+      for (let a = 0; a < k; a++) {
+        Aty[a] += r[a] * y[i];
+        for (let b = 0; b < k; b++) AtA[a][b] += r[a] * r[b];
+      }
+    });
+    return { x: solve(AtA, Aty), AtA };
+  }
+  function linearFit(x, y) {
+    const rows = [], ys = [];
+    x.forEach((v, i) => { if (Number.isFinite(v) && Number.isFinite(y[i])) { rows.push([1, v]); ys.push(y[i]); } });
+    if (rows.length < 3) return null;
+    return lstsq(rows, ys).x;
+  }
+  function detrendLinear(x, y) {
+    const c = linearFit(x, y);
+    if (!c) return y.slice();
+    const tr = x.map(v => c[0] + c[1] * v);
+    const mt = finite(tr).reduce((s, v) => s + v, 0) / Math.max(1, finite(tr).length);
+    return y.map((v, i) => v - tr[i] + mt);
+  }
+  function binIndex(t, widthDays) {
+    const t0 = Math.min(...finite(t));
+    return t.map(v => Math.floor((v - t0) / widthDays));
+  }
+  function binSeries(t, y, widthMin) {
+    const id = binIndex(t, widthMin / 1440);
+    const groups = new Map();
+    id.forEach((g, i) => { if (Number.isFinite(y[i]) && Number.isFinite(t[i])) { if (!groups.has(g)) groups.set(g, []); groups.get(g).push(i); } });
+    const out = { t: [], y: [], e: [], n: [] };
+    [...groups.keys()].sort((a, b) => a - b).forEach(g => {
+      const idx = groups.get(g);
+      if (idx.length < 2) return;
+      const ys = idx.map(i => y[i]);
+      const [m, sd] = meanStd(ys);
+      out.t.push(idx.reduce((s, i) => s + t[i], 0) / idx.length);
+      out.y.push(m);
+      out.e.push(sd / Math.sqrt(idx.length - 1 || 1));
+      out.n.push(idx.length);
+    });
+    return out;
+  }
+  function binnedScatter(t, y, widthMin) {
+    const d = detrendLinear(t, y);
+    const b = binSeries(t, d, widthMin).y.filter((_, i, arr) => arr.length > 0);
+    return b.length > 2 ? stdOf(b) : NaN;
+  }
+
+  // ---------- FITS ----------
+  function cardText(bytes, pos) {
+    let s = '';
+    for (let i = 0; i < 80; i++) s += String.fromCharCode(bytes[pos + i]);
+    return s;
+  }
+  function parseValue(raw) {
+    const t = raw.trim();
+    if (t.startsWith("'")) {
+      let out = '', i = 1;
+      while (i < t.length) {
+        if (t[i] === "'") { if (t[i + 1] === "'") { out += "'"; i += 2; continue; } break; }
+        out += t[i]; i++;
+      }
+      return out.replace(/\s+$/, '');
+    }
+    const v = t.split('/')[0].trim();
+    if (v === 'T') return true;
+    if (v === 'F') return false;
+    if (v === '') return '';
+    const n = Number(v.replace(/D/i, 'E'));
+    return Number.isFinite(n) ? n : v;
+  }
+  function parseHeaderAt(bytes, offset) {
+    const header = {};
+    let pos = offset;
+    while (pos + 80 <= bytes.length) {
+      const card = cardText(bytes, pos);
+      pos += 80;
+      const key = card.slice(0, 8).trim();
+      if (key === 'END') return { header, dataStart: offset + Math.ceil((pos - offset) / BLOCK) * BLOCK };
+      if (key && card.slice(8, 10) === '= ' && !(key in header)) header[key] = parseValue(card.slice(10));
+    }
+    return null;
+  }
+  function hduDataBytes(h) {
+    const n = h.NAXIS | 0;
+    if (!n) return 0;
+    let k = 1;
+    for (let i = 1; i <= n; i++) k *= (h['NAXIS' + i] | 0);
+    return k * Math.abs(h.BITPIX | 0) / 8 + (h.PCOUNT | 0);
+  }
+  function locateImage(bytes) {
+    let off = 0, merged = {};
+    for (let hdu = 0; hdu < 8; hdu++) {
+      const r = parseHeaderAt(bytes, off);
+      if (!r) return { needBytes: off + BLOCK * 16 };
+      const h = r.header;
+      if (h.ZIMAGE === true) return { error: '압축된 FITS(.fz)는 읽을 수 없습니다. 압축을 푼 파일을 쓰세요.' };
+      merged = Object.assign({}, merged, h);
+      const isImage = !h.XTENSION || String(h.XTENSION).trim() === 'IMAGE';
+      if (isImage && (h.NAXIS | 0) >= 2 && (h.NAXIS1 | 0) > 1 && (h.NAXIS2 | 0) > 1) return { header: merged, dataStart: r.dataStart };
+      off = r.dataStart + Math.ceil(hduDataBytes(h) / BLOCK) * BLOCK;
+      if (off + 80 > bytes.length) return { needBytes: off + BLOCK * 16 };
+    }
+    return { error: '2차원 이미지가 들어 있는 부분을 찾지 못했습니다.' };
+  }
+  function parseFITS(buffer) {
+    const bytes = new Uint8Array(buffer);
+    const loc = locateImage(bytes);
+    if (!loc.header) throw new Error(loc.error || 'FITS 헤더를 끝까지 읽지 못했습니다.');
+    const h = loc.header, W = h.NAXIS1 | 0, H = h.NAXIS2 | 0, bp = h.BITPIX | 0;
+    const bz = typeof h.BZERO === 'number' ? h.BZERO : 0;
+    const bs = typeof h.BSCALE === 'number' ? h.BSCALE : 1;
+    const blank = typeof h.BLANK === 'number' ? h.BLANK : null;
+    const n = W * H, size = Math.abs(bp) / 8;
+    if (loc.dataStart + n * size > bytes.length) throw new Error('파일이 중간에 잘려 있습니다.');
+    const dv = new DataView(buffer, loc.dataStart, n * size);
+    const out = new Float32Array(n);
+    if (bp === 16) { for (let i = 0; i < n; i++) { const r = dv.getInt16(i * 2); out[i] = (blank !== null && r === blank) ? NaN : r * bs + bz; } }
+    else if (bp === -32) { for (let i = 0; i < n; i++) out[i] = dv.getFloat32(i * 4) * bs + bz; }
+    else if (bp === 32) { for (let i = 0; i < n; i++) { const r = dv.getInt32(i * 4); out[i] = (blank !== null && r === blank) ? NaN : r * bs + bz; } }
+    else if (bp === 8) { for (let i = 0; i < n; i++) out[i] = dv.getUint8(i) * bs + bz; }
+    else if (bp === -64) { for (let i = 0; i < n; i++) out[i] = dv.getFloat64(i * 8) * bs + bz; }
+    else throw new Error(`지원하지 않는 픽셀 형식입니다 (BITPIX=${bp}).`);
+    return { header: h, W, H, data: out };
+  }
+
+  // ---------- time and sky ----------
+  function isoToJD(s) {
+    const m = String(s).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{1,2}):(\d{1,2}(?:\.\d*)?))?/);
+    if (!m) return NaN;
+    let Y = +m[1], M = +m[2];
+    const D = +m[3], hh = +(m[4] || 0), mm = +(m[5] || 0), ss = +(m[6] || 0);
+    if (M <= 2) { Y -= 1; M += 12; }
+    const A = Math.floor(Y / 100), B = 2 - A + Math.floor(A / 4);
+    return Math.floor(365.25 * (Y + 4716)) + Math.floor(30.6001 * (M + 1)) + D + B - 1524.5 + (hh + mm / 60 + ss / 3600) / 24;
+  }
+  function jdToUTC(jd) {
+    const z = Math.floor(jd + 0.5), f = jd + 0.5 - z;
+    let A = z;
+    if (z >= 2299161) { const a = Math.floor((z - 1867216.25) / 36524.25); A = z + 1 + a - Math.floor(a / 4); }
+    const B = A + 1524, C = Math.floor((B - 122.1) / 365.25), Dd = Math.floor(365.25 * C), E = Math.floor((B - Dd) / 30.6001);
+    const day = B - Dd - Math.floor(30.6001 * E);
+    const month = E < 14 ? E - 1 : E - 13, year = month > 2 ? C - 4716 : C - 4715;
+    let secs = Math.round(f * 86400);
+    const hh = Math.floor(secs / 3600); secs -= hh * 3600;
+    const mi = Math.floor(secs / 60), ss = secs - mi * 60;
+    const p = v => String(v).padStart(2, '0');
+    return { date: `${year}-${p(month)}-${p(day)}`, time: `${p(hh)}:${p(mi)}:${p(ss)}`, hm: `${p(hh)}:${p(mi)}` };
+  }
+  function parseRA(v) {
+    if (v == null || v === '') return NaN;
+    if (typeof v === 'number') return v;
+    const s = String(v).trim();
+    const p = s.split(/[\s:hHmMsS]+/).filter(Boolean).map(Number);
+    if (p.length >= 2 && p.every(Number.isFinite)) return 15 * (p[0] + p[1] / 60 + (p[2] || 0) / 3600);
+    const x = Number(s);
+    return Number.isFinite(x) ? x : NaN;
+  }
+  function parseDec(v) {
+    if (v == null || v === '') return NaN;
+    if (typeof v === 'number') return v;
+    const s = String(v).trim();
+    const neg = s.startsWith('-');
+    const p = s.replace(/^[+-]/, '').split(/[\s:dDmMsS°'"]+/).filter(Boolean).map(Number);
+    if (p.length >= 2 && p.every(Number.isFinite)) { const d = p[0] + p[1] / 60 + (p[2] || 0) / 3600; return neg ? -d : d; }
+    const x = Number(s);
+    return Number.isFinite(x) ? x : NaN;
+  }
+  function bjdTDB(jdUTC, raDeg, decDeg) {
+    if (!Number.isFinite(raDeg) || !Number.isFinite(decDeg)) return jdUTC + 69.184 / 86400;
+    const n = jdUTC - 2451545.0;
+    const L = (280.460 + 0.9856474 * n) * DEG;
+    const g = (357.528 + 0.9856003 * n) * DEG;
+    const lam = L + (1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * DEG;
+    const R = 1.00014 - 0.01671 * Math.cos(g) - 0.00014 * Math.cos(2 * g);
+    const eps = (23.439 - 0.0000004 * n) * DEG;
+    const sx = R * Math.cos(lam), sy = R * Math.sin(lam) * Math.cos(eps), sz = R * Math.sin(lam) * Math.sin(eps);
+    const a = raDeg * DEG, d = decDeg * DEG;
+    const dot = -(sx * Math.cos(d) * Math.cos(a) + sy * Math.cos(d) * Math.sin(a) + sz * Math.sin(d));
+    return jdUTC + (69.184 + dot * AU_LIGHT_S) / 86400;
+  }
+  function num(v, d) { return typeof v === 'number' && Number.isFinite(v) ? v : d; }
+  function headerInfo(h) {
+    const date = h['DATE-OBS'] ?? h.DATE_OBS ?? h.DATEOBS ?? h['DATE-BEG'];
+    let iso = date != null ? String(date).trim() : '';
+    let timeSource = 'DATE-OBS';
+    if (iso && !iso.includes('T')) {
+      const tm = h['TIME-OBS'] ?? h.TIME_OBS ?? h.UT ?? h.UTSTART ?? h['UT-START'];
+      if (tm != null) { iso = `${iso}T${String(tm).trim()}`; timeSource = 'DATE-OBS + TIME-OBS'; }
+    }
+    let jd = iso ? isoToJD(iso) : NaN;
+    if (!Number.isFinite(jd) && typeof h['MJD-OBS'] === 'number') { jd = h['MJD-OBS'] + 2400000.5; timeSource = 'MJD-OBS'; }
+    if (!Number.isFinite(jd) && typeof h.JD === 'number') { jd = h.JD; timeSource = 'JD'; }
+    const exptime = num(h.EXPTIME ?? h.EXPOSURE ?? h.EXP_TIME, 0);
+    const raRaw = h.OBJCTRA ?? h.RA ?? h['OBJ-RA'];
+    const decRaw = h.OBJCTDEC ?? h.DEC ?? h['OBJ-DEC'];
+    return {
+      jd, jdMid: jd + exptime / 2 / 86400, iso, exptime, timeSource,
+      airmass: num(h.AIRMASS, NaN),
+      filter: String(h.FILTER ?? h.FILTNAM ?? '').trim() || '필터 정보 없음',
+      ra: parseRA(raRaw), dec: parseDec(decRaw),
+      raText: raRaw != null ? String(raRaw).trim() : '', decText: decRaw != null ? String(decRaw).trim() : '',
+      W: h.NAXIS1 | 0, H: h.NAXIS2 | 0,
+      gain: num(h.EGAIN ?? h.GAIN, NaN),
+      object: String(h.OBJECT ?? '').trim(),
+    };
+  }
+
+  // ---------- image measurement ----------
+  function imageBackground(img) {
+    const { data } = img, n = data.length;
+    const step = Math.max(1, Math.floor(n / 40000)) | 1;
+    const s = [];
+    for (let i = step >> 1; i < n; i += step) { const v = data[i]; if (Number.isFinite(v)) s.push(v); }
+    return clippedStats(s);
+  }
+  function saturationLevel(img) {
+    const h = img.header || {};
+    if (typeof h.SATURATE === 'number') return h.SATURATE;
+    if (typeof h.DATAMAX === 'number' && h.DATAMAX > 0) return h.DATAMAX;
+    const bp = h.BITPIX | 0, bs = typeof h.BSCALE === 'number' ? h.BSCALE : 1, bz = typeof h.BZERO === 'number' ? h.BZERO : 0;
+    if (bp === 16) return 32767 * bs + bz;
+    if (bp === 8) return 255 * bs + bz;
+    return NaN;
+  }
+  function comCentroid(img, x, y, half = 12, iters = 3) {
+    const { W, H, data } = img;
+    for (let it = 0; it < iters; it++) {
+      const x0 = Math.round(x), y0 = Math.round(y);
+      if (!(x0 - half >= 0 && y0 - half >= 0 && x0 + half < W && y0 + half < H)) return null;
+      const border = [];
+      for (let k = -half; k <= half; k++) {
+        border.push(data[(y0 - half) * W + x0 + k], data[(y0 + half) * W + x0 + k], data[(y0 + k) * W + x0 - half], data[(y0 + k) * W + x0 + half]);
+      }
+      const bg = median(border);
+      let peak = -Infinity;
+      for (let dy = -half; dy <= half; dy++) for (let dx = -half; dx <= half; dx++) {
+        const v = data[(y0 + dy) * W + x0 + dx] - bg;
+        if (v > peak) peak = v;
+      }
+      if (!(peak > 0)) return null;
+      const thr = 0.15 * peak;
+      let sw = 0, sx = 0, sy = 0;
+      for (let dy = -half; dy <= half; dy++) for (let dx = -half; dx <= half; dx++) {
+        const w = data[(y0 + dy) * W + x0 + dx] - bg - thr;
+        if (w > 0) { sw += w; sx += w * dx; sy += w * dy; }
+      }
+      if (!(sw > 0)) return null;
+      x = x0 + sx / sw;
+      y = y0 + sy / sw;
+    }
+    return [x, y];
+  }
+  function subpixelWeight(dx, dy, r) {
+    let c = 0;
+    for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) {
+      const sx = dx + a * 0.2, sy = dy + b * 0.2;
+      if (sx * sx + sy * sy <= r * r) c++;
+    }
+    return c / 25;
+  }
+  function photometryMulti(img, x, y, radii, gain = 1) {
+    const { W, H, data } = img, R = radii.length;
+    const flux = new Float64Array(R).fill(NaN), err = new Float64Array(R).fill(NaN), bkg = new Float64Array(R).fill(NaN);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return { flux, err, bkg };
+    const rmax = radii[R - 1] + ANN_GAP + ANN_WIDTH;
+    const x0 = Math.round(x), y0 = Math.round(y), h = Math.ceil(rmax) + 1;
+    const xa = Math.max(0, x0 - h), xb = Math.min(W - 1, x0 + h), ya = Math.max(0, y0 - h), yb = Math.min(H - 1, y0 + h);
+    const ds = [], vs = [], dxs = [], dys = [];
+    for (let yy = ya; yy <= yb; yy++) for (let xx = xa; xx <= xb; xx++) {
+      const v = data[yy * W + xx];
+      if (!Number.isFinite(v)) continue;
+      const dx = xx - x, dy = yy - y, d = Math.hypot(dx, dy);
+      if (d < rmax) { ds.push(d); vs.push(v); dxs.push(dx); dys.push(dy); }
+    }
+    for (let k = 0; k < R; k++) {
+      const r = radii[k], rin = r + ANN_GAP, rout = rin + ANN_WIDTH;
+      if (x - rout < 0 || y - rout < 0 || x + rout > W - 1 || y + rout > H - 1) continue;
+      const ann = [];
+      let sum = 0, area = 0;
+      for (let i = 0; i < ds.length; i++) {
+        const d = ds[i];
+        if (d >= rin && d < rout) ann.push(vs[i]);
+        if (d <= r - 0.7072) { sum += vs[i]; area += 1; }
+        else if (d < r + 0.7072) { const w = subpixelWeight(dxs[i], dys[i], r); sum += w * vs[i]; area += w; }
+      }
+      if (ann.length < 10 || !(area > 0)) continue;
+      const st = clippedStats(ann);
+      const net = sum - st.median * area;
+      flux[k] = net;
+      bkg[k] = st.median;
+      err[k] = Math.sqrt(Math.max(net, 0) / gain + area * st.std * st.std);
+    }
+    return { flux, err, bkg };
+  }
+  function detectStars(img, opt = {}) {
+    const { W, H, data } = img;
+    const sigma = opt.sigma ?? 8, fwhm = opt.fwhm ?? 6, maxStars = opt.maxStars ?? 80;
+    const bg = imageBackground(img);
+    if (!(bg.std > 0)) return [];
+    const thr = bg.median + sigma * bg.std, thrLow = bg.median + 0.5 * sigma * bg.std;
+    const edge = Math.max(12, Math.ceil(2 * fwhm));
+    const cands = [];
+    for (let y = edge; y < H - edge; y++) {
+      const row = y * W;
+      for (let x = edge; x < W - edge; x++) {
+        const v = data[row + x];
+        if (!(v > thr)) continue;
+        let isMax = true, cnt = 0;
+        for (let dy = -1; dy <= 1 && isMax; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const u = data[row + dy * W + x + dx];
+          if (u > v || (u === v && (dy < 0 || (dy === 0 && dx < 0)))) { isMax = false; break; }
+          if (u > thrLow) cnt++;
+        }
+        if (isMax && cnt >= 4) cands.push([v, x, y]);
+      }
+    }
+    cands.sort((a, b) => b[0] - a[0]);
+    const minSep = Math.max(3, 1.5 * fwhm), cell = minSep, gridMap = new Map(), accepted = [];
+    const key = (gx, gy) => gx + ',' + gy;
+    for (const c of cands) {
+      if (accepted.length >= 4000) break;
+      const gx = Math.floor(c[1] / cell), gy = Math.floor(c[2] / cell);
+      let clash = false;
+      for (let a = -1; a <= 1 && !clash; a++) for (let b = -1; b <= 1; b++) {
+        const list = gridMap.get(key(gx + a, gy + b));
+        if (list && list.some(p => Math.hypot(p[0] - c[1], p[1] - c[2]) < minSep)) { clash = true; break; }
+      }
+      if (clash) continue;
+      accepted.push(c);
+      const k2 = key(gx, gy);
+      if (!gridMap.has(k2)) gridMap.set(k2, []);
+      gridMap.get(k2).push([c[1], c[2]]);
+    }
+    const sat = saturationLevel(img), rq = Math.max(3, 1.5 * fwhm), half = Math.max(4, Math.round(1.5 * fwhm));
+    const stars = [];
+    for (const [, x, y] of accepted.slice(0, maxStars * 4)) {
+      const c = comCentroid(img, x, y, half, 2);
+      if (!c) continue;
+      if (stars.some(s => Math.hypot(s.x - c[0], s.y - c[1]) < minSep)) continue;
+      const ph = photometryMulti(img, c[0], c[1], [rq], 1);
+      if (!(ph.flux[0] > 0)) continue;
+      let peak = -Infinity;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const xx = Math.round(c[0]) + dx, yy = Math.round(c[1]) + dy;
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H) peak = Math.max(peak, data[yy * W + xx]);
+      }
+      stars.push({ x: c[0], y: c[1], flux: ph.flux[0], peak, saturated: Number.isFinite(sat) && peak >= 0.95 * sat });
+    }
+    stars.sort((a, b) => b.flux - a.flux);
+    const top = stars.slice(0, maxStars);
+    top.forEach((s, i) => {
+      s.id = i;
+      let nd = Infinity, nf = 0;
+      for (const o of stars) {
+        if (o === s) continue;
+        const d = Math.hypot(o.x - s.x, o.y - s.y);
+        if (d < nd) { nd = d; nf = o.flux; }
+      }
+      s.nearest = nd;
+      s.nearestRatio = nf / s.flux;
+    });
+    top.background = bg;
+    top.all = stars;
+    return top;
+  }
+  function estimateFWHM(img, stars) {
+    const { W, data } = img, out = [];
+    for (const s of stars.filter(st => !st.saturated).slice(0, 12)) {
+      const x0 = Math.round(s.x), y0 = Math.round(s.y), half = 10;
+      if (x0 - half < 0 || y0 - half < 0 || x0 + half >= img.W || y0 + half >= img.H) continue;
+      const border = [];
+      for (let k = -half; k <= half; k++) border.push(data[(y0 - half) * W + x0 + k], data[(y0 + half) * W + x0 + k]);
+      const bg = median(border);
+      let sw = 0, sr = 0;
+      for (let dy = -half; dy <= half; dy++) for (let dx = -half; dx <= half; dx++) {
+        const w = data[(y0 + dy) * W + x0 + dx] - bg;
+        const rx = x0 + dx - s.x, ry = y0 + dy - s.y;
+        if (w > 0 && rx * rx + ry * ry <= 64) { sw += w; sr += w * (rx * rx + ry * ry); }
+      }
+      if (sw > 0) out.push(2.3548 * Math.sqrt(sr / sw / 2));
+    }
+    return median(out);
+  }
+
+  // ---------- frame alignment ----------
+  function makeAligner(img, stars, numStars = 14) {
+    const { W, H } = img;
+    const pts = stars.slice(0, Math.max(numStars * 3, 30)).map(s => [s.x, s.y]);
+    const cand = pts.slice(0, numStars * 2);
+    let chosen = [];
+    for (const gap of [50, 35, 25]) {
+      chosen = [];
+      cand.forEach(([x, y], i) => {
+        if (x < 60 || y < 60 || x > W - 60 || y > H - 60) return;
+        let nearest = Infinity;
+        for (const [u, v] of pts) { const d = Math.hypot(u - x, v - y); if (d > 0.5 && d < nearest) nearest = d; }
+        if (nearest >= gap) chosen.push(i);
+      });
+      if (chosen.length >= 4) break;
+    }
+    chosen = chosen.slice(0, numStars);
+    if (chosen.length < 4) return null;
+    return { cx: W / 2, cy: H / 2, ref: chosen.map(i => cand[i]), refAll: pts.slice(0, 14) };
+  }
+  function predict(al, p, pts) {
+    return pts.map(([x, y]) => {
+      const u = x - al.cx, v = y - al.cy;
+      return [p.ar * u - p.ai * v + p.tr + al.cx, p.ai * u + p.ar * v + p.ti + al.cy];
+    });
+  }
+  function fitSimilarity(al, ref, cur) {
+    let keep = ref.map(() => true), p = { ...IDENTITY }, rms = Infinity, n = ref.length;
+    for (let it = 0; it < 3; it++) {
+      const rows = [], ys = [];
+      ref.forEach(([x, y], i) => {
+        if (!keep[i]) return;
+        const u = x - al.cx, v = y - al.cy;
+        rows.push([u, -v, 1, 0]); ys.push(cur[i][0] - al.cx);
+        rows.push([v, u, 0, 1]); ys.push(cur[i][1] - al.cy);
+      });
+      const sol = lstsq(rows, ys).x;
+      if (!sol) return null;
+      p = { ar: sol[0], ai: sol[1], tr: sol[2], ti: sol[3] };
+      const pr = predict(al, p, ref);
+      const res = pr.map((q, i) => Math.hypot(q[0] - cur[i][0], q[1] - cur[i][1]));
+      let s = 0, m = 0;
+      res.forEach((r, i) => { if (keep[i]) { s += r * r; m++; } });
+      rms = Math.sqrt(s / m);
+      n = m;
+      const lim = Math.max(1, 3 * rms), nk = res.map(r => r < lim);
+      if (nk.filter(Boolean).length < 4 || nk.every((v, i) => v === keep[i])) break;
+      keep = nk;
+    }
+    return { p, rms, n };
+  }
+  function estimate(al, img, guess, half = 12) {
+    const pr = predict(al, guess, al.ref), okRef = [], cur = [];
+    pr.forEach(([x, y], i) => {
+      const c = comCentroid(img, x, y, half, 3);
+      if (c && Math.hypot(c[0] - x, c[1] - y) < half - 2) { okRef.push(al.ref[i]); cur.push(c); }
+    });
+    if (okRef.length < 4) return null;
+    const f = fitSimilarity(al, okRef, cur);
+    if (!f || f.n < 4 || f.rms > 2) return null;
+    return f;
+  }
+  function estimateBySearch(al, img, detectOpt) {
+    const found = detectStars(img, { ...(detectOpt || {}), maxStars: 30 });
+    if (found.length < 4) return null;
+    const cur = found.map(s => [s.x, s.y]);
+    let best = null;
+    for (const rot of [1, -1]) {
+      const moved = al.refAll.map(([x, y]) => [rot * (x - al.cx) + al.cx, rot * (y - al.cy) + al.cy]);
+      const votes = new Map(), diffs = [];
+      for (const [mx, my] of moved) for (const [qx, qy] of cur) {
+        const dx = qx - mx, dy = qy - my;
+        if (Math.hypot(dx, dy) < 300) {
+          diffs.push([dx, dy]);
+          const k = Math.round(dx / 4) + ',' + Math.round(dy / 4);
+          votes.set(k, (votes.get(k) || 0) + 1);
+        }
+      }
+      if (!votes.size) continue;
+      let bestKey = null, bestN = 0;
+      for (const [k, v] of votes) if (v > bestN) { bestN = v; bestKey = k; }
+      const [kx, ky] = bestKey.split(',').map(Number);
+      const near = diffs.filter(([dx, dy]) => Math.hypot(dx - kx * 4, dy - ky * 4) < 6);
+      const res = estimate(al, img, { ar: rot, ai: 0, tr: median(near.map(d => d[0])), ti: median(near.map(d => d[1])) });
+      if (res && (!best || res.n > best.n)) best = res;
+    }
+    return best;
+  }
+  function alignFrame(al, img, guess, detectOpt) {
+    let res = estimate(al, img, guess);
+    if (!res) res = estimateBySearch(al, img, detectOpt);
+    if (res) res = estimate(al, img, res.p) || res;
+    return res;
+  }
+
+  // ---------- photometry over all frames ----------
+  async function runPhotometry(o) {
+    const radii = o.radii || RADII, R = radii.length;
+    const stars = [o.targetXY, ...o.compXY], K = stars.length;
+    const rec = { radii, K, frames: [], stopped: false };
+    let p = { ...IDENTITY };
+    for (let i = 0; i < o.count; i++) {
+      if (o.shouldStop && o.shouldStop()) { rec.stopped = true; break; }
+      const meta = o.meta[i];
+      let img;
+      try { img = await o.loadFrame(i); }
+      catch (e) { rec.frames.push({ i, name: meta.name, error: e.message || String(e) }); if (o.onProgress) o.onProgress(i + 1, o.count); continue; }
+      let res = null, alignFailed = false;
+      if (o.aligner) { res = alignFrame(o.aligner, img, p, o.detectOpt); if (res) p = res.p; else alignFailed = true; }
+      const pred = o.aligner ? predict(o.aligner, p, stars) : stars.map(s => [s[0], s[1]]);
+      const fr = {
+        i, name: meta.name, jdMid: meta.jdMid, airmass: meta.airmass,
+        rot: Math.atan2(p.ai, p.ar) / DEG, shiftC: Math.hypot(p.tr, p.ti), rms: res ? res.rms : NaN, nAlign: res ? res.n : 0, alignFailed,
+        x: new Float64Array(K), y: new Float64Array(K), shift: new Float64Array(K), move: new Float64Array(K),
+        flux: new Float64Array(K * R), err: new Float64Array(K * R),
+      };
+      for (let k = 0; k < K; k++) {
+        let [x, y] = pred[k];
+        const c = comCentroid(img, x, y, 4, 2);
+        let sh = NaN;
+        if (c) { sh = Math.hypot(c[0] - x, c[1] - y); if (sh <= (o.maxShift || 6)) { x = c[0]; y = c[1]; } }
+        fr.x[k] = x; fr.y[k] = y; fr.shift[k] = sh;
+        fr.move[k] = Math.hypot(pred[k][0] - stars[k][0], pred[k][1] - stars[k][1]);
+        const ph = photometryMulti(img, x, y, radii, o.gain || 1);
+        for (let r = 0; r < R; r++) { fr.flux[k * R + r] = ph.flux[r]; fr.err[k * R + r] = ph.err[r]; }
+      }
+      rec.frames.push(fr);
+      img = null;
+      if (o.onProgress) o.onProgress(i + 1, o.count, fr);
+      await new Promise(r => setTimeout(r, 0));
+    }
+    return rec;
+  }
+
+  // ---------- analysis ----------
+  function magOf(f, e) { return f > 0 ? [-2.5 * Math.log10(f), 1.0857 * e / f] : [NaN, NaN]; }
+  function buildSeries(rec, rIdx, use) {
+    const R = rec.radii.length, K = rec.K, rows = [];
+    for (const fr of rec.frames) {
+      if (fr.error) continue;
+      const [tm, te] = magOf(fr.flux[rIdx], fr.err[rIdx]);
+      const cm = [], ce = [];
+      for (let k = 1; k < K; k++) { const [m, e] = magOf(fr.flux[k * R + rIdx], fr.err[k * R + rIdx]); cm.push(m); ce.push(e); }
+      let sw = 0, sm = 0;
+      cm.forEach((m, j) => { if (use[j] && Number.isFinite(m) && ce[j] > 0) { const w = 1 / (ce[j] * ce[j]); sw += w; sm += w * m; } });
+      const c = sw > 0 ? sm / sw : NaN, cerr = sw > 0 ? Math.sqrt(1 / sw) : NaN;
+      let shiftMax = Number.isFinite(fr.shift[0]) ? fr.shift[0] : 0;
+      for (let k = 1; k < K; k++) if (use[k - 1] && Number.isFinite(fr.shift[k])) shiftMax = Math.max(shiftMax, fr.shift[k]);
+      rows.push({ fr, jd: fr.jdMid, airmass: fr.airmass, tmag: tm, terr: te, cmag: c, cerr, diff: tm - c, derr: Math.hypot(te, cerr), cm, ce, shiftMax });
+    }
+    return rows;
+  }
+  function vetComps(rows, nComp) {
+    const series = Array.from({ length: nComp }, () => []);
+    for (const r of rows) {
+      if (!r.cm.every(Number.isFinite)) continue;
+      for (let j = 0; j < nComp; j++) series[j].push(r.cm[j] - median(r.cm.filter((_, k) => k !== j)));
+    }
+    const stds = series.map(s => (s.length >= 3 ? stdOf(s) : Infinity));
+    const fin = stds.filter(Number.isFinite);
+    const limit = fin.length ? Math.min(0.03, Math.max(3 * median(fin), 0.01)) : 0.03;
+    return { stds, limit, flags: stds.map(s => !(s <= limit)), series, enough: nComp >= 3 };
+  }
+  function compScatter(rec, rIdx, use, widthMin = 10) {
+    const rows = buildSeries(rec, rIdx, use.map(() => true));
+    const idx = use.map((u, j) => (u ? j : -1)).filter(j => j >= 0);
+    if (idx.length < 2) return NaN;
+    const t = rows.map(r => r.jd), vals = [];
+    for (const j of idx) {
+      const others = idx.filter(k => k !== j);
+      const d = rows.map(r => {
+        let sw = 0, sm = 0;
+        for (const k of others) if (Number.isFinite(r.cm[k]) && r.ce[k] > 0) { const w = 1 / (r.ce[k] * r.ce[k]); sw += w; sm += w * r.cm[k]; }
+        return sw > 0 && Number.isFinite(r.cm[j]) ? r.cm[j] - sm / sw : NaN;
+      });
+      const s = binnedScatter(t, d, widthMin);
+      if (Number.isFinite(s)) vals.push(s);
+    }
+    return median(vals);
+  }
+  function contactTimes(tc, durH, ingH) { const d = durH / 24, g = ingH / 24; return [tc - d / 2, tc - d / 2 + g, tc + d / 2 - g, tc + d / 2]; }
+  function transitShape(bjd, tc, durH, ingH) {
+    const [t1, t2, t3, t4] = contactTimes(tc, durH, ingH), g = t2 - t1;
+    return bjd.map(b => (b >= t2 && b <= t3 ? 1 : b > t1 && b < t2 ? (b - t1) / g : b > t3 && b < t4 ? (t4 - b) / g : 0));
+  }
+  // quadratic limb darkening: I(mu) = 1 - u1(1-mu) - u2(1-mu)^2; relative flux when a planet of radius k sits at separation z
+  function ldFlux(z, k, u1, u2) {
+    if (!(z < 1 + k)) return 1;
+    const N = 300, r0 = Math.max(0, z - k), r1 = Math.min(1, z + k), h = (r1 - r0) / N;
+    let s = 0;
+    for (let i = 0; i < N; i++) {
+      const r = r0 + (i + 0.5) * h, mu = Math.sqrt(Math.max(0, 1 - r * r));
+      const I = 1 - u1 * (1 - mu) - u2 * (1 - mu) * (1 - mu);
+      let f;
+      if (z < 1e-9) f = r < k ? 1 : 0;
+      else if (r + z <= k) f = 1;
+      else if (r < 1e-12) f = z < k ? 1 : 0;
+      else { const c = (r * r + z * z - k * k) / (2 * r * z); f = c >= 1 ? 0 : c <= -1 ? 1 : Math.acos(c) / Math.PI; }
+      s += I * f * 2 * Math.PI * r;
+    }
+    return 1 - (s * h) / (Math.PI * (1 - u1 / 3 - u2 / 6));
+  }
+  function orbitA2(P, durH, b, k) {
+    const s = Math.sin(Math.PI * durH / 24 / P);
+    return b * b + ((1 + k) * (1 + k) - b * b) / (s * s);
+  }
+  function ldShape(bjd, tc, P, durH, b, k, u1, u2) {
+    const A2 = orbitA2(P, durH, b, k);
+    const zOf = t => { const ph = 2 * Math.PI * (t - tc) / P; return Math.cos(ph) < 0 ? 1e9 : Math.sqrt(A2 * Math.sin(ph) ** 2 + b * b * Math.cos(ph) ** 2); };
+    const dmid = 1 - ldFlux(b, k, u1, u2);
+    return { shape: bjd.map(t => (dmid > 0 ? (1 - ldFlux(zOf(t), k, u1, u2)) / dmid : 0)), dmid, aRs: Math.sqrt(A2) };
+  }
+  function contactTimesLD(tc, P, durH, b, k) {
+    const A2 = orbitA2(P, durH, b, k), half = durH / 48;
+    const inner = ((1 - k) ** 2 - b * b) / (A2 - b * b);
+    const t23 = inner > 0 ? Math.asin(Math.sqrt(inner)) * P / (2 * Math.PI) : NaN;
+    return [tc - half, tc - t23, tc + t23, tc + half];
+  }
+  function fitTransit(bjd, d, trend, tc, durH, ingH, binMin = 10) { return fitWithShape(bjd, d, trend, transitShape(bjd, tc, durH, ingH), binMin); }
+  function fitWithShape(bjd, d, trend, shape, binMin = 10) {
+    const id = binIndex(bjd, binMin / 1440), groups = new Map();
+    id.forEach((g, i) => { if (Number.isFinite(d[i]) && (!trend || Number.isFinite(trend[i]))) { if (!groups.has(g)) groups.set(g, []); groups.get(g).push(i); } });
+    const rows = [], rows0 = [], y = [];
+    const mean = (idx, arr) => idx.reduce((s, i) => s + arr[i], 0) / idx.length;
+    for (const g of [...groups.keys()].sort((a, b) => a - b)) {
+      const idx = groups.get(g);
+      if (idx.length < 3) continue;
+      const base = trend ? [1, mean(idx, trend)] : [1];
+      rows0.push(base); rows.push([...base, mean(idx, shape)]); y.push(mean(idx, d));
+    }
+    if (!rows.length || rows.length < rows[0].length + 2) return null;
+    const { x, AtA } = lstsq(rows, y);
+    if (!x) return null;
+    const res = y.map((v, i) => v - rows[i].reduce((s, a, k) => s + a * x[k], 0));
+    const dof = Math.max(1, y.length - x.length), s2 = res.reduce((s, v) => s + v * v, 0) / dof;
+    const inv = invert(AtA);
+    const x0 = lstsq(rows0, y).x;
+    const res0 = x0 ? y.map((v, i) => v - rows0[i].reduce((s, a, k) => s + a * x0[k], 0)) : res;
+    const rms = a => Math.sqrt(a.reduce((s, v) => s + v * v, 0) / a.length);
+    return { coef: x, depth: x[x.length - 1], err: inv ? Math.sqrt(s2 * inv[x.length - 1][x.length - 1]) : NaN, rmsFit: rms(res), rmsFlat: rms(res0), nBins: y.length };
+  }
+
+  // ---------- example data ----------
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function makeExample() {
+    const W = 720, H = 480, N = 150, cadence = 70, exptime = 60;
+    const jdStart = isoToJD('2026-10-10T11:00:00');
+    const raText = '01 20 00', decText = '+35 00 00', ra = parseRA(raText), dec = parseDec(decText);
+    const rng = mulberry32(20261010);
+    const stars = [
+      { x: 362.3, y: 247.6, f: 2.2e5, role: 'target' },
+      { x: 375.1, y: 252.4, f: 3.6e5, role: 'neighbour' },
+      { x: 132.4, y: 318.9, f: 4.8e5, role: 'variable' },
+      { x: 560.2, y: 120.7, f: 3.1e5 }, { x: 210.5, y: 98.3, f: 2.6e5 }, { x: 610.8, y: 380.4, f: 1.9e5 },
+      { x: 95.6, y: 420.2, f: 2.4e5 }, { x: 455.3, y: 405.9, f: 1.6e5 }, { x: 300.4, y: 160.2, f: 1.3e5 },
+    ];
+    while (stars.length < 46) {
+      const s = { x: 15 + rng() * (W - 30), y: 15 + rng() * (H - 30), f: Math.exp(Math.log(6e3) + rng() * Math.log(1.2e5 / 6e3)) };
+      if (stars.every(o => Math.hypot(o.x - s.x, o.y - s.y) > 20)) stars.push(s);
+    }
+    const tcH = 1.45, durH = 1.8, ingH = 0.3, P = 2.73174, kEx = 0.11, bEx = 0.3, u1Ex = 0.38, u2Ex = 0.27;
+    const A2ex = orbitA2(P, durH, bEx, kEx);
+    const meta = [];
+    for (let i = 0; i < N; i++) {
+      const tStartS = i * cadence, jd = jdStart + tStartS / 86400, jdMid = jd + exptime / 2 / 86400, tH = (tStartS + exptime / 2) / 3600;
+      const alt = (38 + 9.5 * tH) * DEG;
+      const u = jdToUTC(jd);
+      meta.push({ index: i, name: `예제_${String(i + 1).padStart(4, '0')}-R.fit`, jd, jdMid, tH, exptime, airmass: 1 / Math.sin(alt), filter: 'R', ra, dec, raText, decText, W, H, gain: 1.5, iso: `${u.date}T${u.time}`, object: '예제 별', timeSource: 'DATE-OBS' });
+    }
+    function load(i) {
+      const m = meta[i], t = m.tH, r = mulberry32(1000 + i);
+      const gauss = () => { let a = 0, b = 0; while (a === 0) a = r(); b = r(); return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b); };
+      const data = new Float32Array(W * H);
+      const sig = 1.9 + 0.22 * Math.sin(2 * Math.PI * t / 0.7);
+      const transp = Math.pow(10, -0.4 * 0.12 * (m.airmass - 1)) * (1 - 0.05 * Math.exp(-(((t - 2.05) / 0.05) ** 2))) * (1 + 0.004 * gauss());
+      const th = 0.8 * t * DEG, ct = Math.cos(th), st = Math.sin(th), txx = 1.2 * t + 0.25 * gauss(), tyy = -0.8 * t + 0.25 * gauss();
+      const model = new Float32Array(W * H);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) model[y * W + x] = 300 + 0.02 * x;
+      const ph = 2 * Math.PI * (t - tcH) / 24 / P, zt = Math.sqrt(A2ex * Math.sin(ph) ** 2 + bEx * bEx * Math.cos(ph) ** 2);
+      const transitFlux = ldFlux(zt, kEx, u1Ex, u2Ex);
+      for (const s of stars) {
+        let f = s.f * transp;
+        if (s.role === 'variable') f *= 1 + 0.06 * Math.sin(2 * Math.PI * t / 1.6);
+        if (s.role === 'target') f *= transitFlux * Math.pow(10, -0.4 * 0.005 * (m.airmass - 1));
+        const u = s.x - W / 2, v = s.y - H / 2;
+        const px = ct * u - st * v + W / 2 + txx, py = st * u + ct * v + H / 2 + tyy;
+        const rr = Math.ceil(4.5 * sig), amp = f / (2 * Math.PI * sig * sig);
+        for (let yy = Math.max(0, Math.floor(py) - rr); yy <= Math.min(H - 1, Math.floor(py) + rr); yy++) {
+          for (let xx = Math.max(0, Math.floor(px) - rr); xx <= Math.min(W - 1, Math.floor(px) + rr); xx++) {
+            const d2 = (xx - px) ** 2 + (yy - py) ** 2;
+            model[yy * W + xx] += amp * Math.exp(-d2 / (2 * sig * sig));
+          }
+        }
+      }
+      for (let k = 0; k < W * H; k++) data[k] = model[k] + gauss() * Math.sqrt(model[k] / 1.5 + 28);
+      return { header: { 'DATE-OBS': m.iso, EXPTIME: exptime, AIRMASS: m.airmass, FILTER: 'R', OBJCTRA: raText, OBJCTDEC: decText, EGAIN: 1.5, BITPIX: -32 }, W, H, data };
+    }
+    const tcJd = jdStart + (tcH * 3600) / 86400;
+    const dmidEx = 1 - ldFlux(bEx, kEx, u1Ex, u2Ex);
+    const planet = { T0: bjdTDB(tcJd, ra, dec) - 300 * P, P, durH, ingH, k: kEx, b: bEx, u1: u1Ex, u2: u2Ex, depthMmag: -2.5 * Math.log10(1 - dmidEx) * 1000, raText: '01h20m00s', decText: '+35d00m00s' };
+    return { meta, load, planet, truth: { target: [362.3, 247.6], neighbour: [375.1, 252.4], variable: [132.4, 318.9] } };
+  }
+
+  return {
+    RADII, ANN_GAP, ANN_WIDTH, median, stdOf, p2p, clippedStats, detrendLinear, linearFit, binSeries, binnedScatter,
+    locateImage, parseFITS, headerInfo, isoToJD, jdToUTC, parseRA, parseDec, bjdTDB,
+    imageBackground, comCentroid, photometryMulti, detectStars, estimateFWHM,
+    makeAligner, predict, alignFrame, runPhotometry,
+    buildSeries, vetComps, compScatter, contactTimes, transitShape, fitTransit, makeExample,
+    ldFlux, ldShape, contactTimesLD, fitWithShape,
+  };
+})();
+</script>
+
+<script>
+(() => {
+  'use strict';
+  const C = Core;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fx = (v, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '–');
+  const fs = (v, d = 1) => (Number.isFinite(v) ? (v >= 0 ? '+' : '') + v.toFixed(d) : '–');
+
+  const S = {
+    mode: 'variable', source: null, groups: new Map(), frames: [], example: null,
+    refImg: null, stars: [], fwhm: NaN, detectOpt: { sigma: 8, fwhm: 6 },
+    sel: { target: null, comps: [] }, pick: 'target', zoom: null,
+    rec: null, use: [], vet: null, rIdx: 3, scores: null, stop: false, kept: null,
+  };
+  const STATE_TEXT = { locked: '잠김', ready: '실행 전', running: '실행 중', done: '완료' };
+
+  function setState(n, st) {
+    const el = $('s' + n);
+    el.dataset.state = st;
+    el.querySelector('.pill').textContent = STATE_TEXT[st];
+    const fsEl = $('c' + n);
+    if (fsEl) fsEl.disabled = st === 'locked';
+    el.querySelectorAll('[data-run]').forEach(b => { b.disabled = st === 'locked' || st === 'running'; });
+  }
+  function stateOf(n) { return $('s' + n).dataset.state; }
+  const PLACEHOLDER = {
+    2: '1단계를 마치면 실행할 수 있습니다.', 3: '2단계를 마치면 별을 고를 수 있습니다.', 4: '3단계에서 대상과 비교성을 확정하면 실행할 수 있습니다.',
+    5: '4단계 측광이 끝나면 실행할 수 있습니다.', 6: '5단계 점검이 끝나면 그릴 수 있습니다.', 7: '6단계 광도곡선을 그리면 실행할 수 있습니다.', 8: '6단계 광도곡선을 그리면 실행할 수 있습니다.',
+  };
+  function lockFrom(n) {
+    for (let k = n; k <= 8; k++) {
+      setState(k, 'locked');
+      if (k !== 3) $('o' + k).innerHTML = `<p class="placeholder">${PLACEHOLDER[k]}</p>`;
+    }
+    if (n <= 3) $('o3').innerHTML = `<p class="placeholder">${PLACEHOLDER[3]}</p>`;
+  }
+  function msgList(items) {
+    if (!items.length) return '';
+    return `<ul class="msgs">${items.map(m => `<li class="${m.k || ''}">${m.t}</li>`).join('')}</ul>`;
+  }
+  function kvs(items) { return `<div class="kv">${items.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>`; }
+
+  // ---------- charts (matplotlib look) ----------
+  const MPL = { C0: '#1f77b4', C1: '#ff7f0e', C2: '#2ca02c', C3: '#d62728', gray: '#7f7f7f', crimson: '#dc143c', k: '#000000' };
+  const MPL_FONT = "DejaVu Sans, Bitstream Vera Sans, Verdana, Noto Sans KR, Malgun Gothic, sans-serif";
+  const DASH = { '--': '6 3.5', ':': '1.5 2.5', '-.': '6 2.5 1.5 2.5' };
+  function niceTicks(a, b, n = 5) {
+    const span = b - a || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), r = raw / mag;
+    const step = (r >= 7.5 ? 10 : r >= 3.5 ? 5 : r >= 1.5 ? 2 : 1) * mag, out = [];
+    for (let v = Math.ceil(a / step) * step; v <= b + span * 1e-9; v += step) out.push(+v.toPrecision(12));
+    return out;
+  }
+  function tickFmt(v, ticks) {
+    const step = ticks.length > 1 ? Math.abs(ticks[1] - ticks[0]) : 1;
+    const d = Math.max(0, Math.min(4, -Math.floor(Math.log10(step) + 1e-9)));
+    const s = v.toFixed(d);
+    return s.startsWith('-') ? '−' + s.slice(1) : s;
+  }
+  function textWidth(s, size) {
+    let w = 0;
+    for (const ch of String(s)) w += /[ᄀ-ᇿ㄰-㆏가-힯]/.test(ch) ? size * 0.98 : size * 0.6;
+    return w;
+  }
+  function chart(host, spec) {
+    const Wd = spec.width || 760, Hd = spec.height || 320, fsz = spec.small ? 9 : 10;
+    const m = { l: spec.small ? 48 : 64, r: 14, t: spec.title ? (spec.small ? 24 : 30) : 10, b: spec.small ? 38 : 46 };
+    const pw = Wd - m.l - m.r, ph = Hd - m.t - m.b;
+    const xs = [], ys = [], ysCore = [];
+    for (const s of spec.series) {
+      s.x.forEach((xv, i) => {
+        const yv = s.y[i];
+        if (!Number.isFinite(xv) || !Number.isFinite(yv)) return;
+        xs.push(xv);
+        (s.kind === 'dots' ? ys : ysCore).push(yv);
+        if (s.e && Number.isFinite(s.e[i])) ysCore.push(yv + s.e[i], yv - s.e[i]);
+      });
+    }
+    let [x0, x1] = spec.xDomain || [Math.min(...xs), Math.max(...xs)];
+    if (!(x1 > x0)) { x0 -= 1; x1 += 1; }
+    const sd = Float64Array.from(ys).sort();
+    const q = p => sd[Math.min(sd.length - 1, Math.max(0, Math.round(p * (sd.length - 1))))];
+    const yAll = ysCore.concat(sd.length ? [q(0.005), q(0.995)] : []);
+    let [y0, y1] = spec.yDomain || [Math.min(...yAll), Math.max(...yAll)];
+    if (!(y1 > y0)) { y0 -= 1; y1 += 1; }
+    if (!spec.yDomain) { const p = (y1 - y0) * 0.06; y0 -= p; y1 += p; }
+    if (!spec.xDomain) { const p = (x1 - x0) * 0.05; x0 -= p; x1 += p; }
+    const X = v => m.l + (v - x0) / (x1 - x0) * pw;
+    const Y = v => (spec.invertY ? m.t + (v - y0) / (y1 - y0) * ph : m.t + (y1 - v) / (y1 - y0) * ph);
+    const xt = niceTicks(x0, x1, spec.xTicks || 6).filter(t => t >= x0 && t <= x1);
+    const yt = niceTicks(y0, y1, spec.small ? 4 : 6).filter(t => t >= y0 && t <= y1);
+    const cid = 'cl' + Math.random().toString(36).slice(2, 8);
+    let g = `<svg viewBox="0 0 ${Wd} ${Hd}" font-family="${MPL_FONT}" role="img" aria-label="${esc(spec.title || spec.aria || '그래프')}">`;
+    g += `<defs><clipPath id="${cid}"><rect x="${m.l}" y="${m.t}" width="${pw}" height="${ph}"/></clipPath></defs><rect width="${Wd}" height="${Hd}" fill="#ffffff"/>`;
+    if (spec.grid !== false) {
+      for (const t of yt) g += `<line x1="${m.l}" x2="${m.l + pw}" y1="${Y(t)}" y2="${Y(t)}" stroke="#b0b0b0" stroke-opacity="0.35" stroke-width="0.8"/>`;
+      for (const t of xt) g += `<line y1="${m.t}" y2="${m.t + ph}" x1="${X(t)}" x2="${X(t)}" stroke="#b0b0b0" stroke-opacity="0.35" stroke-width="0.8"/>`;
+    }
+    g += `<g clip-path="url(#${cid})">`;
+    for (const v of spec.vlines || []) {
+      if (!(v.x >= x0 && v.x <= x1)) continue;
+      const col = v.color || MPL.crimson;
+      g += `<line x1="${X(v.x)}" x2="${X(v.x)}" y1="${m.t}" y2="${m.t + ph}" stroke="${col}" stroke-width="1" stroke-dasharray="${DASH[':']}"/>`;
+      g += `<text x="${X(v.x) + 3}" y="${m.t + 11}" font-size="${fsz - 0.5}" fill="${col}">${esc(v.label)}</text>`;
+    }
+    for (const s of spec.series) {
+      const col = s.color || MPL.C0, a = s.alpha ?? 1;
+      if (s.kind === 'dots') {
+        s.x.forEach((xv, i) => { const yv = s.y[i]; if (Number.isFinite(xv) && Number.isFinite(yv)) g += `<circle cx="${X(xv).toFixed(1)}" cy="${Y(yv).toFixed(1)}" r="${s.r || 2.4}" fill="${col}" fill-opacity="${a}"/>`; });
+      } else if (s.kind === 'line') {
+        let d = '', pen = false;
+        s.x.forEach((xv, i) => { const yv = s.y[i]; if (Number.isFinite(xv) && Number.isFinite(yv)) { d += `${pen ? 'L' : 'M'}${X(xv).toFixed(1)},${Y(yv).toFixed(1)}`; pen = true; } else pen = false; });
+        g += `<path d="${d}" fill="none" stroke="${col}" stroke-opacity="${a}" stroke-width="${s.lw || 1.5}" stroke-linejoin="round"${s.dash ? ` stroke-dasharray="${DASH[s.dash]}"` : ''}/>`;
+      } else if (s.kind === 'bins') {
+        const cap = s.cap ?? 3;
+        s.x.forEach((xv, i) => {
+          const yv = s.y[i];
+          if (!Number.isFinite(xv) || !Number.isFinite(yv)) return;
+          const cx = X(xv);
+          if (s.e && Number.isFinite(s.e[i])) {
+            const ya = Y(yv - s.e[i]), yb = Y(yv + s.e[i]);
+            g += `<path d="M${cx},${ya}L${cx},${yb}M${cx - cap},${ya}L${cx + cap},${ya}M${cx - cap},${yb}L${cx + cap},${yb}" stroke="${col}" stroke-width="1.2" fill="none"/>`;
+          }
+          g += `<circle cx="${cx.toFixed(1)}" cy="${Y(yv).toFixed(1)}" r="${s.r || 3.6}" fill="${col}" fill-opacity="${a}"/>`;
+        });
+      }
+    }
+    for (const mk of spec.marks || []) g += `<circle cx="${X(mk.x)}" cy="${Y(mk.y)}" r="5.5" fill="none" stroke="${MPL.C3}" stroke-width="2"/><text x="${X(mk.x) + 9}" y="${Y(mk.y) - 8}" font-size="${fsz}" fill="${MPL.C3}">${esc(mk.label)}</text>`;
+    g += '</g>';
+    g += `<rect x="${m.l}" y="${m.t}" width="${pw}" height="${ph}" fill="none" stroke="#000" stroke-width="0.8"/>`;
+    for (const t of xt) g += `<line x1="${X(t)}" x2="${X(t)}" y1="${m.t + ph}" y2="${m.t + ph + 3.5}" stroke="#000" stroke-width="0.8"/><text x="${X(t)}" y="${m.t + ph + 15}" font-size="${fsz}" fill="#000" text-anchor="middle">${tickFmt(t, xt)}</text>`;
+    for (const t of yt) g += `<line x1="${m.l - 3.5}" x2="${m.l}" y1="${Y(t)}" y2="${Y(t)}" stroke="#000" stroke-width="0.8"/><text x="${m.l - 6}" y="${Y(t) + 3.5}" font-size="${fsz}" fill="#000" text-anchor="end">${tickFmt(t, yt)}</text>`;
+    g += `<text x="${m.l + pw / 2}" y="${Hd - (spec.small ? 6 : 8)}" font-size="${fsz + 1}" fill="#000" text-anchor="middle">${esc(spec.xLabel || '')}</text>`;
+    g += `<text transform="translate(${spec.small ? 12 : 15} ${m.t + ph / 2}) rotate(-90)" font-size="${fsz + 1}" fill="#000" text-anchor="middle">${esc(spec.yLabel || '')}</text>`;
+    if (spec.title) g += `<text x="${m.l + pw / 2}" y="${spec.small ? 15 : 19}" font-size="${fsz + 2}" fill="#000" text-anchor="middle">${esc(spec.title)}</text>`;
+
+    const entries = spec.series.filter(s => s.label).map(s => ({ kind: s.kind, color: s.color || MPL.C0, alpha: s.alpha ?? 1, dash: s.dash, lw: s.lw, label: s.label }));
+    if (spec.vlineLabel && (spec.vlines || []).length) entries.push({ kind: 'vline', color: MPL.crimson, label: spec.vlineLabel });
+    if (entries.length) {
+      const lh = fsz + 6, handle = 22, pad = 6;
+      const bw = pad * 2 + handle + 6 + Math.max(...entries.map(e => textWidth(e.label, fsz)));
+      const bh = pad * 2 + lh * entries.length - 4;
+      const corners = [[m.l + pw - bw - 6, m.t + 6], [m.l + 6, m.t + 6], [m.l + pw - bw - 6, m.t + ph - bh - 6], [m.l + 6, m.t + ph - bh - 6]];
+      const pts = [];
+      for (const s of spec.series) s.x.forEach((xv, i) => { if (Number.isFinite(xv) && Number.isFinite(s.y[i])) pts.push([X(xv), Y(s.y[i])]); });
+      let best = corners[0], bestN = Infinity;
+      for (const c of corners) {
+        const n = pts.filter(([px, py]) => px >= c[0] && px <= c[0] + bw && py >= c[1] && py <= c[1] + bh).length;
+        if (n < bestN) { bestN = n; best = c; }
+      }
+      const [lx, ly] = best;
+      g += `<rect x="${lx}" y="${ly}" width="${bw}" height="${bh}" rx="3" fill="#ffffff" fill-opacity="0.85" stroke="#cccccc" stroke-width="0.8"/>`;
+      entries.forEach((e, i) => {
+        const cy = ly + pad + lh * i + lh / 2 - 2, hx = lx + pad;
+        if (e.kind === 'dots') g += `<circle cx="${hx + handle / 2}" cy="${cy}" r="3" fill="${e.color}" fill-opacity="${Math.max(e.alpha, 0.6)}"/>`;
+        else if (e.kind === 'bins') g += `<path d="M${hx + handle / 2},${cy - 5}L${hx + handle / 2},${cy + 5}M${hx + handle / 2 - 3},${cy - 5}L${hx + handle / 2 + 3},${cy - 5}M${hx + handle / 2 - 3},${cy + 5}L${hx + handle / 2 + 3},${cy + 5}" stroke="${e.color}" stroke-width="1.2" fill="none"/><circle cx="${hx + handle / 2}" cy="${cy}" r="3.4" fill="${e.color}"/>`;
+        else if (e.kind === 'vline') g += `<line x1="${hx + handle / 2}" x2="${hx + handle / 2}" y1="${cy - 6}" y2="${cy + 6}" stroke="${e.color}" stroke-dasharray="${DASH[':']}"/>`;
+        else g += `<line x1="${hx}" x2="${hx + handle}" y1="${cy}" y2="${cy}" stroke="${e.color}" stroke-width="${e.lw || 1.5}"${e.dash ? ` stroke-dasharray="${DASH[e.dash]}"` : ''}/>`;
+        g += `<text x="${hx + handle + 6}" y="${cy + 3.5}" font-size="${fsz}" fill="#000">${esc(e.label)}</text>`;
+      });
+    }
+    g += `<circle r="6" cx="-20" cy="-20" fill="none" stroke="#000" stroke-width="1.4" visibility="hidden" class="hl"/><rect class="hit" x="${m.l}" y="${m.t}" width="${pw}" height="${ph}" fill="transparent"/></svg>`;
+    host.innerHTML = `${g}<div class="tip" hidden></div>`;
+    if (spec.hover && spec.hover.x.length) {
+      const svg = host.querySelector('svg'), tip = host.querySelector('.tip'), hl = host.querySelector('.hl'), hit = host.querySelector('.hit');
+      const show = ev => {
+        const pt = svg.createSVGPoint();
+        pt.x = ev.clientX; pt.y = ev.clientY;
+        const loc = pt.matrixTransform(svg.getScreenCTM().inverse());
+        const xv = x0 + (loc.x - m.l) / pw * (x1 - x0);
+        let bi = -1, bd = Infinity;
+        spec.hover.x.forEach((v, i) => { const d = Math.abs(v - xv); if (d < bd && Number.isFinite(spec.hover.y[i])) { bd = d; bi = i; } });
+        if (bi < 0) return;
+        const cx = X(spec.hover.x[bi]), cy = Y(spec.hover.y[bi]);
+        hl.setAttribute('cx', cx); hl.setAttribute('cy', cy); hl.setAttribute('visibility', 'visible');
+        const r = svg.getBoundingClientRect(), hr = host.getBoundingClientRect();
+        tip.style.left = (r.left - hr.left + cx / Wd * r.width) + 'px';
+        tip.style.top = (r.top - hr.top + cy / Hd * r.height) + 'px';
+        tip.textContent = spec.hover.text(bi);
+        tip.hidden = false;
+      };
+      hit.addEventListener('pointermove', show);
+      hit.addEventListener('pointerleave', () => { tip.hidden = true; hl.setAttribute('visibility', 'hidden'); });
+    }
+  }
+  function chartBox(cls = '') { const d = document.createElement('div'); d.className = 'chart ' + cls; return d; }
+
+  // ---------- step 1: load ----------
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', () => { S.mode = r.value; applyModeDefaults(); }));
+  function applyModeDefaults() {
+    $('binMin').value = S.mode === 'transit' ? '10' : '0';
+    $('suggestN').value = S.mode === 'transit' ? '6' : '4';
+    $('yUnit').value = S.mode === 'transit' ? 'flux' : 'mmag';
+  }
+  applyModeDefaults();
+  $('pickFiles').addEventListener('click', () => $('fileInput').click());
+  $('pickFolder').addEventListener('click', () => $('folderInput').click());
+  $('fileInput').addEventListener('change', e => { loadFiles([...e.target.files]); e.target.value = ''; });
+  $('folderInput').addEventListener('change', e => { loadFiles([...e.target.files]); e.target.value = ''; });
+  const drop = $('drop');
+  drop.addEventListener('keydown', e => { if (e.target === drop && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); $('fileInput').click(); } });
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', async e => {
+    e.preventDefault();
+    drop.classList.remove('over');
+    const items = [...(e.dataTransfer.items || [])];
+    const entries = items.map(it => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null)).filter(Boolean);
+    if (entries.length) {
+      const out = [];
+      const walk = async entry => {
+        if (entry.isFile) await new Promise(res => entry.file(f => { out.push(f); res(); }, res));
+        else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          let batch;
+          do { batch = await new Promise(res => reader.readEntries(res, () => res([]))); for (const en of batch) await walk(en); } while (batch.length);
+        }
+      };
+      for (const en of entries) await walk(en);
+      loadFiles(out);
+    } else loadFiles([...e.dataTransfer.files]);
+  });
+
+  async function readMeta(file) {
+    let size = 2880 * 12;
+    for (let tries = 0; tries < 5; tries++) {
+      const buf = await file.slice(0, Math.min(size, file.size)).arrayBuffer();
+      const loc = C.locateImage(new Uint8Array(buf));
+      if (loc.header) return { name: file.webkitRelativePath || file.name, file, ...C.headerInfo(loc.header) };
+      if (loc.error) throw new Error(loc.error);
+      if (size >= file.size) throw new Error('헤더의 끝(END)을 찾지 못했습니다.');
+      size = Math.max(size * 4, loc.needBytes || 0);
+    }
+    throw new Error('헤더를 읽지 못했습니다.');
+  }
+  async function loadFiles(list) {
+    const files = list.filter(f => /\.(fits?|fts)$/i.test(f.name));
+    if (!files.length) { $('o1').innerHTML = msgList([{ k: 'bad', t: 'FITS 파일(.fit, .fits, .fts)을 찾지 못했습니다. 파일 확장자를 확인하세요.' }]); return; }
+    setState(1, 'running');
+    lockFrom(2);
+    $('o1').innerHTML = `<p class="log" id="scanLog">헤더 읽는 중… 0 / ${files.length}</p><progress id="scanBar" max="${files.length}" value="0"></progress>`;
+    const metas = [], errors = [];
+    for (let i = 0; i < files.length; i++) {
+      try { metas.push(await readMeta(files[i])); } catch (e) { errors.push(`${files[i].name}: ${e.message}`); }
+      if (i % 5 === 4 || i === files.length - 1) { $('scanLog').textContent = `헤더 읽는 중… ${i + 1} / ${files.length}`; $('scanBar').value = i + 1; await new Promise(r => setTimeout(r, 0)); }
+    }
+    S.source = 'files';
+    S.example = null;
+    finishLoad(metas, errors);
+  }
+  $('exampleBtn').addEventListener('click', () => {
+    S.example = C.makeExample();
+    S.source = 'example';
+    document.querySelector('input[name="mode"][value="transit"]').checked = true;
+    S.mode = 'transit';
+    applyModeDefaults();
+    $('detFwhm').value = '4.5';
+    setState(1, 'running');
+    lockFrom(2);
+    finishLoad(S.example.meta.map(m => ({ ...m, file: null })), []);
+  });
+  function finishLoad(metas, errors) {
+    const groups = new Map();
+    const noTime = metas.filter(m => !Number.isFinite(m.jd));
+    for (const m of metas.filter(x => Number.isFinite(x.jd))) { if (!groups.has(m.filter)) groups.set(m.filter, []); groups.get(m.filter).push(m); }
+    for (const g of groups.values()) g.sort((a, b) => a.jd - b.jd);
+    S.groups = groups;
+    if (!groups.size) {
+      setState(1, 'ready');
+      $('o1').innerHTML = msgList([{ k: 'bad', t: '촬영 시각(DATE-OBS 등)이 있는 사진이 없습니다. 헤더에 촬영 시각이 기록됐는지 확인하세요.' }, ...errors.slice(0, 5).map(t => ({ k: 'bad', t: esc(t) }))]);
+      return;
+    }
+    const best = [...groups.entries()].sort((a, b) => b[1].length - a[1].length)[0][0];
+    renderStep1(best, errors, noTime);
+  }
+  function renderStep1(filter, errors, noTime) {
+    S.frames = S.groups.get(filter);
+    const f = S.frames, first = f[0], last = f[f.length - 1];
+    const spanH = (last.jdMid - first.jdMid) * 24;
+    const cad = f.length > 1 ? (last.jdMid - first.jdMid) * 86400 / (f.length - 1) : NaN;
+    const air = f.map(m => m.airmass).filter(Number.isFinite);
+    const u1 = C.jdToUTC(first.jd), u2 = C.jdToUTC(last.jd);
+    const opts = [...S.groups.entries()].map(([k, v]) => `<option value="${esc(k)}"${k === filter ? ' selected' : ''}>${esc(k)} (${v.length}장)</option>`).join('');
+    const msgs = [];
+    if (S.source === 'example') msgs.push({ k: 'ok', t: '예제 데이터입니다. 실제 관측이 아니라, 식현상이 있는 별을 흉내 내도록 만든 사진 150장입니다. 시야가 조금씩 돌아가고, 변광성 하나와 대상 바로 옆의 밝은 별, 잠깐 지나가는 구름까지 넣어 두었습니다.' });
+    if (S.groups.size > 1) msgs.push({ k: 'warn', t: `필터가 ${S.groups.size}종류 섞여 있습니다. 한 번에 한 필터씩 분석합니다. 아래에서 고르세요.` });
+    if (f.length < 10) msgs.push({ k: 'warn', t: `이 필터의 사진이 ${f.length}장뿐입니다. 시간에 따른 변화를 보려면 수십 장 이상이 좋습니다.` });
+    if (!air.length) msgs.push({ k: '', t: '헤더에 대기질량(AIRMASS)이 없어서, 추세는 시간 기준으로만 다룹니다.' });
+    if (noTime.length) msgs.push({ k: 'warn', t: `촬영 시각이 없어 뺀 사진 ${noTime.length}장: ${esc(noTime.slice(0, 3).map(m => m.name).join(', '))}${noTime.length > 3 ? ' …' : ''}` });
+    if (errors.length) msgs.push({ k: 'bad', t: `읽지 못한 파일 ${errors.length}개: ${esc(errors.slice(0, 3).join(' / '))}${errors.length > 3 ? ' …' : ''}` });
+    $('o1').innerHTML = `
+      ${kvs([[f.length + '장', '분석할 사진'], [fx(spanH, 2) + ' 시간', '관측 길이'], [fx(cad, 0) + ' 초', '평균 촬영 간격'], [fx(first.exptime, 0) + ' 초', '노출 시간'], [`${first.W}×${first.H}`, '사진 크기 (픽셀)'], [air.length ? `${fx(Math.max(...air), 2)} → ${fx(air[air.length - 1], 2)}` : '없음', '대기질량 (처음 → 끝)']])}
+      <div class="controls" style="padding:0"><label class="field"><span>분석할 필터</span><select id="filterSel">${opts}</select></label>
+      <p class="log">관측: ${u1.date} ${u1.time} ~ ${u2.time} UTC · 시각 정보: ${esc(first.timeSource)}${first.object ? ' · 대상: ' + esc(first.object) : ''}</p></div>
+      ${msgList(msgs)}`;
+    $('filterSel').addEventListener('change', e => { lockFrom(2); renderStep1(e.target.value, errors, noTime); });
+    if (Number.isFinite(first.gain)) $('gain').value = String(first.gain);
+    setBand(bandFromFilter(filter));
+    if (first.raText) $('fRa').value = first.raText;
+    if (first.decText) $('fDec').value = first.decText;
+    if (S.source === 'example') { $('fRa').value = S.example.planet.raText; $('fDec').value = S.example.planet.decText; }
+    setState(1, 'done');
+    setState(2, 'ready');
+  }
+  async function loadFrame(i) {
+    const m = S.frames[i];
+    if (S.source === 'example') return S.example.load(m.index);
+    return C.parseFITS(await m.file.arrayBuffer());
+  }
+
+  // ---------- image rendering ----------
+  function stretch(img, region) {
+    const { W, H, data } = img, s = [];
+    if (region) {
+      for (let y = region.y0; y <= region.y1; y++) for (let x = region.x0; x <= region.x1; x++) { const v = data[y * W + x]; if (Number.isFinite(v)) s.push(v); }
+    } else {
+      const step = Math.max(1, Math.floor(data.length / 60000)) | 1;
+      for (let i = 0; i < data.length; i += step) { const v = data[i]; if (Number.isFinite(v)) s.push(v); }
+    }
+    const a = Float64Array.from(s).sort(), q = p => a[Math.min(a.length - 1, Math.floor(p * (a.length - 1)))];
+    const lo = q(0.25), hi = Math.max(q(0.998), lo + 1);
+    return { lo, hi };
+  }
+  function gray(v, st) {
+    const t = Math.min(1, Math.max(0, (v - st.lo) / (st.hi - st.lo)));
+    return Math.round(255 * Math.asinh(8 * t) / Math.asinh(8));
+  }
+  function drawOverview(canvas, img) {
+    const { W, H, data } = img;
+    const dw = Math.min(W, 1000), scale = dw / W, dh = Math.round(H * scale);
+    canvas.width = dw; canvas.height = dh;
+    const st = stretch(img), ctx = canvas.getContext('2d'), id = ctx.createImageData(dw, dh), inv = 1 / scale;
+    const n = Math.max(1, Math.min(3, Math.round(inv)));
+    for (let j = 0; j < dh; j++) {
+      const yb = Math.floor((dh - 1 - j) * inv);
+      for (let i = 0; i < dw; i++) {
+        const xb = Math.floor(i * inv);
+        let sum = 0, c = 0;
+        for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) {
+          const yy = Math.min(H - 1, yb + Math.floor(a * inv / n)), xx = Math.min(W - 1, xb + Math.floor(b * inv / n));
+          const v = data[yy * W + xx];
+          if (Number.isFinite(v)) { sum += v; c++; }
+        }
+        const gv = gray(c ? sum / c : st.lo, st), p = (j * dw + i) * 4;
+        id.data[p] = id.data[p + 1] = id.data[p + 2] = gv; id.data[p + 3] = 255;
+      }
+    }
+    ctx.putImageData(id, 0, 0);
+    return { scale, dw, dh };
+  }
+  const toDisp = (v, x, y) => [(x + 0.5) * v.scale, (v.H - 0.5 - y) * v.scale];
+
+  // ---------- step 2: detect ----------
+  $('run2').addEventListener('click', async () => {
+    setState(2, 'running');
+    lockFrom(3);
+    $('o2').innerHTML = '<p class="log">첫 사진을 여는 중…</p>';
+    await new Promise(r => setTimeout(r, 30));
+    try {
+      const img = await loadFrame(0);
+      S.refImg = img;
+      S.detectOpt = { sigma: +$('detSigma').value || 8, fwhm: +$('detFwhm').value || 6 };
+      const stars = C.detectStars(img, { ...S.detectOpt, maxStars: 80 });
+      S.stars = stars;
+      S.fwhm = C.estimateFWHM(img, stars);
+      renderStep2(img, stars);
+      if (stars.length < 3) { setState(2, 'ready'); return; }
+      setState(2, 'done');
+      setState(3, 'ready');
+      S.sel = { target: null, comps: [] };
+      S.zoom = { x: img.W / 2, y: img.H / 2 };
+      renderStep3();
+    } catch (e) {
+      setState(2, 'ready');
+      $('o2').innerHTML = msgList([{ k: 'bad', t: `첫 사진을 열지 못했습니다: ${esc(e.message)}` }]);
+    }
+  });
+  function renderStep2(img, stars) {
+    const bg = stars.background, msgs = [];
+    if (stars.length < 3) msgs.push({ k: 'bad', t: '별을 거의 찾지 못했습니다. 탐지 기준(σ)을 낮추거나 FWHM을 실제 별 크기에 맞춰 다시 실행하세요.' });
+    if (Number.isFinite(S.fwhm) && Math.abs(S.fwhm - S.detectOpt.fwhm) > 0.4 * S.detectOpt.fwhm) msgs.push({ k: 'warn', t: `밝은 별들로 잰 실제 별 크기(FWHM)는 약 ${fx(S.fwhm, 1)}픽셀입니다. 입력값(${S.detectOpt.fwhm})과 차이가 크면 그 값으로 바꿔 다시 실행해 보세요.` });
+    const sat = stars.filter(s => s.saturated).length;
+    if (sat) msgs.push({ k: 'warn', t: `포화된(너무 밝아 픽셀 값이 꽉 찬) 별이 ${sat}개 있습니다. 포화된 별은 밝기를 정확히 잴 수 없어서 대상·비교성으로 쓰지 않는 것이 좋습니다.` });
+    $('o2').innerHTML = `
+      ${kvs([[stars.length + '개', '찾은 별 (밝은 순 최대 80개)'], [fx(bg.median, 1), '배경 밝기 (ADU)'], [fx(bg.std, 2), '배경 흔들림 σ'], [fx(S.fwhm, 1) + ' px', '별 크기 FWHM (추정)']])}
+      <div class="frame" id="ov2"><canvas></canvas><svg></svg></div>
+      ${msgList(msgs)}
+      <div class="tablewrap"><table><thead><tr><th class="n">번호</th><th class="n">x</th><th class="n">y</th><th class="n">밝기 (최댓값=100)</th><th>포화</th><th class="n">가장 가까운 별</th></tr></thead><tbody>
+      ${stars.slice(0, 15).map(s => `<tr><td class="n">${s.id}</td><td class="n">${fx(s.x, 1)}</td><td class="n">${fx(s.y, 1)}</td><td class="n">${fx(100 * s.flux / stars[0].flux, 1)}</td><td>${s.saturated ? '<span class="tag warn">포화</span>' : ''}</td><td class="n">${fx(s.nearest, 0)} px</td></tr>`).join('')}
+      </tbody></table></div>`;
+    const box = $('ov2'), v = drawOverview(box.querySelector('canvas'), img);
+    v.H = img.H;
+    box.querySelector('svg').setAttribute('viewBox', `0 0 ${v.dw} ${v.dh}`);
+    box.querySelector('svg').innerHTML = stars.map(s => {
+      const [dx, dy] = toDisp(v, s.x, s.y);
+      return `<circle class="mk-other" cx="${dx}" cy="${dy}" r="7"/>${s.id < 25 ? `<text class="mk-label o" x="${dx + 8}" y="${dy - 6}">${s.id}</text>` : ''}`;
+    }).join('');
+  }
+
+  // ---------- step 3: select ----------
+  function setPick(mode) {
+    S.pick = mode;
+    $('modeTarget').setAttribute('aria-pressed', String(mode === 'target'));
+    $('modeComp').setAttribute('aria-pressed', String(mode === 'comp'));
+  }
+  $('modeTarget').addEventListener('click', () => setPick('target'));
+  $('modeComp').addEventListener('click', () => setPick('comp'));
+  $('clearSel').addEventListener('click', () => { S.sel = { target: null, comps: [] }; selectionChanged(); });
+  $('suggestBtn').addEventListener('click', () => {
+    if (!S.sel.target) { note3('먼저 대상 별을 고르세요. 비교성은 대상과 밝기가 비슷한 별 위주로 추천합니다.'); return; }
+    const n = Math.max(1, Math.min(15, +$('suggestN').value || 5)), t = S.sel.target, img = S.refImg;
+    const tf = t.flux > 0 ? t.flux : C.photometryMulti(img, t.x, t.y, [8], 1).flux[0];
+    const cands = S.stars.filter(s => !s.saturated && s.nearest > 40 && s.x > 60 && s.y > 60 && s.x < img.W - 60 && s.y < img.H - 60 && Math.hypot(s.x - t.x, s.y - t.y) > 30);
+    cands.sort((a, b) => Math.abs(Math.log(a.flux / tf)) - Math.abs(Math.log(b.flux / tf)));
+    S.sel.comps = cands.slice(0, n).map(s => ({ x: s.x, y: s.y, id: s.id, flux: s.flux }));
+    if (!S.sel.comps.length) note3('조건에 맞는 비교성 후보가 없습니다. 직접 골라 주세요.');
+    selectionChanged();
+  });
+  function note3(t) { const el = $('note3'); if (el) { el.textContent = t; el.hidden = false; } }
+  function starAt(x, y, tol) {
+    let best = null, bd = tol;
+    for (const s of S.stars) { const d = Math.hypot(s.x - x, s.y - y); if (d < bd) { bd = d; best = s; } }
+    return best;
+  }
+  function pickStar(x, y) {
+    let s = starAt(x, y, 8);
+    let st;
+    if (s) st = { x: s.x, y: s.y, id: s.id, flux: s.flux };
+    else {
+      const c = C.comCentroid(S.refImg, x, y, 6, 3);
+      if (!c) { note3('누른 곳 근처에서 별을 찾지 못했습니다. 별 한가운데를 눌러 보세요.'); return; }
+      st = { x: c[0], y: c[1], id: null, flux: C.photometryMulti(S.refImg, c[0], c[1], [8], 1).flux[0] };
+    }
+    if (S.pick === 'target') {
+      S.sel.target = st;
+      S.sel.comps = S.sel.comps.filter(c => Math.hypot(c.x - st.x, c.y - st.y) > 3);
+      setPick('comp');
+    } else {
+      if (S.sel.target && Math.hypot(S.sel.target.x - st.x, S.sel.target.y - st.y) < 3) { note3('대상 별은 비교성으로 쓸 수 없습니다.'); return; }
+      const i = S.sel.comps.findIndex(c => Math.hypot(c.x - st.x, c.y - st.y) < 3);
+      if (i >= 0) S.sel.comps.splice(i, 1); else S.sel.comps.push(st);
+    }
+    selectionChanged();
+  }
+  function selectionChanged() {
+    if (stateOf(3) === 'done') { setState(3, 'ready'); lockFrom(4); }
+    drawMarks();
+    renderSelection();
+  }
+  function renderStep3() {
+    $('o3').innerHTML = `
+      <div class="viewer">
+        <div class="frame" id="ov3"><canvas></canvas><svg></svg><span class="hint">누르면 오른쪽에 확대</span></div>
+        <div class="selbox">
+          <div class="frame zoom" id="zm3"><canvas width="300" height="300"></canvas><svg viewBox="0 0 300 300"></svg><span class="hint" id="zmHint">별을 눌러 고르기</span></div>
+          <p class="log" id="zmInfo"></p>
+        </div>
+      </div>
+      <p class="log" id="note3" hidden></p>
+      <div id="selInfo"></div>
+      <details><summary>좌표로 직접 입력하기 (첫 사진 기준 픽셀)</summary>
+        <div class="controls" style="padding:10px 0 0">
+          <label class="field"><span>대상 x, y</span><input type="text" class="wide" id="tIn" placeholder="2393.7, 1627.3"></label>
+          <label class="field" style="flex:1 1 320px"><span>비교성 (한 줄에 x, y 하나씩)</span><textarea id="cIn" rows="3" placeholder="473.0, 1560.5&#10;3376.6, 1657.2"></textarea></label>
+          <button class="btn" type="button" id="applyXY">좌표 적용</button>
+        </div>
+      </details>`;
+    const box = $('ov3'), v = drawOverview(box.querySelector('canvas'), S.refImg);
+    v.H = S.refImg.H;
+    S.view = v;
+    box.querySelector('svg').setAttribute('viewBox', `0 0 ${v.dw} ${v.dh}`);
+    box.addEventListener('click', ev => {
+      if (stateOf(3) === 'locked') return;
+      const r = box.getBoundingClientRect(), dx = (ev.clientX - r.left) / r.width * v.dw, dy = (ev.clientY - r.top) / r.height * v.dh;
+      S.zoom = { x: dx / v.scale - 0.5, y: v.H - 0.5 - dy / v.scale };
+      drawZoom();
+      drawMarks();
+    });
+    const zb = $('zm3');
+    zb.addEventListener('click', ev => {
+      if (stateOf(3) === 'locked' || !S.zoomView) return;
+      const r = zb.getBoundingClientRect(), zv = S.zoomView;
+      const px = (ev.clientX - r.left) / r.width * 300, py = (ev.clientY - r.top) / r.height * 300;
+      pickStar(zv.x0 + px / zv.k - 0.5, zv.y1 + 0.5 - py / zv.k);
+    });
+    $('applyXY').addEventListener('click', () => {
+      const parse = s => { const p = s.split(/[\s,]+/).filter(Boolean).map(Number); return p.length >= 2 && p.every(Number.isFinite) ? [p[0], p[1]] : null; };
+      const t = parse($('tIn').value);
+      if (t) S.sel.target = { x: t[0], y: t[1], id: (starAt(t[0], t[1], 4) || {}).id ?? null, flux: C.photometryMulti(S.refImg, t[0], t[1], [8], 1).flux[0] };
+      const comps = $('cIn').value.split('\n').map(parse).filter(Boolean);
+      if (comps.length) S.sel.comps = comps.map(c => ({ x: c[0], y: c[1], id: (starAt(c[0], c[1], 4) || {}).id ?? null, flux: C.photometryMulti(S.refImg, c[0], c[1], [8], 1).flux[0] }));
+      if (!t && !comps.length) { note3('좌표를 읽지 못했습니다. "x, y" 형식으로 적어 주세요.'); return; }
+      if (S.sel.target) S.zoom = { x: S.sel.target.x, y: S.sel.target.y };
+      drawZoom();
+      selectionChanged();
+    });
+    drawZoom();
+    drawMarks();
+    renderSelection();
+  }
+  function drawZoom() {
+    const img = S.refImg, { W, H, data } = img, half = 50, k = 300 / (2 * half);
+    const cx = Math.min(W - half - 1, Math.max(half, Math.round(S.zoom.x))), cy = Math.min(H - half - 1, Math.max(half, Math.round(S.zoom.y)));
+    const x0 = cx - half, y0 = cy - half, x1 = cx + half - 1, y1 = cy + half - 1;
+    S.zoomView = { x0, y0, x1, y1, k };
+    const canvas = $('zm3').querySelector('canvas'), ctx = canvas.getContext('2d'), id = ctx.createImageData(300, 300);
+    const st = stretch(img, { x0, y0, x1, y1 });
+    for (let j = 0; j < 300; j++) {
+      const yy = y1 - Math.floor(j / k);
+      for (let i = 0; i < 300; i++) {
+        const xx = x0 + Math.floor(i / k), gv = gray(data[yy * W + xx], st), p = (j * 300 + i) * 4;
+        id.data[p] = id.data[p + 1] = id.data[p + 2] = gv; id.data[p + 3] = 255;
+      }
+    }
+    ctx.putImageData(id, 0, 0);
+    $('zmInfo').textContent = `확대 영역 중심 x=${cx}, y=${cy} (100×100 픽셀)`;
+  }
+  function drawMarks() {
+    const v = S.view;
+    if (!v || !$('ov3')) return;
+    const t = S.sel.target, comps = S.sel.comps;
+    let o = '';
+    for (const s of S.stars) {
+      const [dx, dy] = toDisp(v, s.x, s.y);
+      o += `<circle class="mk-other" cx="${dx}" cy="${dy}" r="6"/>`;
+    }
+    comps.forEach((c, i) => { const [dx, dy] = toDisp(v, c.x, c.y); o += `<circle class="mk-comp" cx="${dx}" cy="${dy}" r="8"/><text class="mk-label c" x="${dx + 10}" y="${dy - 7}">C${i + 1}</text>`; });
+    if (t) { const [dx, dy] = toDisp(v, t.x, t.y); o += `<circle class="mk-target" cx="${dx}" cy="${dy}" r="10"/><text class="mk-label t" x="${dx + 12}" y="${dy - 9}">대상</text>`; }
+    if (S.zoomView) {
+      const zv = S.zoomView, [ax, ay] = toDisp(v, zv.x0 - 0.5, zv.y1 + 0.5), [bx, by] = toDisp(v, zv.x1 + 0.5, zv.y0 - 0.5);
+      o += `<rect class="mk-zoomrect" x="${ax}" y="${ay}" width="${bx - ax}" height="${by - ay}"/>`;
+    }
+    $('ov3').querySelector('svg').innerHTML = o;
+    if (!S.zoomView) return;
+    const zv = S.zoomView, Z = (x, y) => [(x - zv.x0 + 0.5) * zv.k, (zv.y1 - y + 0.5) * zv.k];
+    let z = '';
+    for (const s of S.stars) {
+      if (s.x < zv.x0 - 5 || s.x > zv.x1 + 5 || s.y < zv.y0 - 5 || s.y > zv.y1 + 5) continue;
+      const [a, b] = Z(s.x, s.y);
+      z += `<circle class="mk-other" cx="${a}" cy="${b}" r="9"/><text class="mk-label o" x="${a + 11}" y="${b - 9}">${s.id}</text>`;
+    }
+    comps.forEach((c, i) => { const [a, b] = Z(c.x, c.y); z += `<circle class="mk-comp" cx="${a}" cy="${b}" r="${12 * zv.k}"/><text class="mk-label c" x="${a + 12 * zv.k + 3}" y="${b}">C${i + 1}</text>`; });
+    if (t) {
+      const [a, b] = Z(t.x, t.y);
+      z += `<circle class="mk-ann" cx="${a}" cy="${b}" r="${16 * zv.k}"/><circle class="mk-ann" cx="${a}" cy="${b}" r="${22 * zv.k}"/><circle class="mk-target" cx="${a}" cy="${b}" r="${12 * zv.k}"/><text class="mk-label t" x="${a + 12 * zv.k + 3}" y="${b}">대상</text>`;
+    }
+    $('zm3').querySelector('svg').innerHTML = z;
+  }
+  function selectionWarnings() {
+    const img = S.refImg, t = S.sel.target, out = [];
+    if (!t) return [{ k: 'warn', t: '대상 별을 고르세요. 확대 그림에서 별을 누르면 대상으로 지정됩니다.' }];
+    const r = Math.hypot(t.x - img.W / 2, t.y - img.H / 2);
+    if (r > 0.35 * Math.min(img.W, img.H)) out.push({ k: 'warn', t: `대상이 사진 가장자리 쪽에 있습니다 (중심에서 ${fx(r, 0)}픽셀). 시야가 1도 돌면 약 ${fx(r * Math.PI / 180, 1)}픽셀 밀립니다. 4단계의 시야 정렬을 꼭 켜고, 다음 관측에서는 대상을 가운데 두세요.` });
+    if (t.id === 0) out.push({ k: 'warn', t: '대상으로 고른 별이 0번(시야에서 가장 밝은 별)입니다. 정말 관측 대상이 맞는지 별 차트(SIMBAD, Aladin 등)와 대조해 보세요.' });
+    const lim = 12 + 4 + 6 + 2 * (Number.isFinite(S.fwhm) ? S.fwhm : S.detectOpt.fwhm);
+    const neighbour = (p, label, advice) => {
+      let best = null;
+      for (const s of S.stars) {
+        const d = Math.hypot(s.x - p.x, s.y - p.y);
+        if (d > 3 && d < lim && s.flux > 0.05 * (p.flux || 1) && (!best || d < best.d)) best = { d, ratio: s.flux / (p.flux || s.flux) };
+      }
+      if (best) out.push({ k: 'warn', t: `${label}: ${fx(best.d, 0)}픽셀 옆에 이 별 밝기의 ${fx(100 * best.ratio, 0)}%인 별이 붙어 있어 빛이 섞일 수 있습니다. ${advice}` });
+    };
+    neighbour(t, '대상', '측광 원을 작게 쓰고 결과 해석에 주의하세요.');
+    S.sel.comps.forEach((c, i) => neighbour(c, `비교성 C${i + 1}`, '이 비교성은 빼는 것을 권장합니다.'));
+    const satIds = new Set(S.stars.filter(s => s.saturated).map(s => s.id));
+    if (t.id != null && satIds.has(t.id)) out.push({ k: 'bad', t: '대상 별이 포화되어 있습니다. 밝기를 정확히 잴 수 없습니다.' });
+    S.sel.comps.forEach((c, i) => { if (c.id != null && satIds.has(c.id)) out.push({ k: 'warn', t: `비교성 C${i + 1}이 포화되어 있습니다. 빼는 것을 권장합니다.` }); });
+    const need = S.mode === 'transit' ? 5 : 3;
+    if (S.sel.comps.length < 1) out.push({ k: 'bad', t: '비교성을 1개 이상 고르세요. "비교성 자동 추천"을 누르거나 확대 그림에서 직접 고를 수 있습니다.' });
+    else if (S.sel.comps.length < need) out.push({ k: '', t: `비교성 ${S.sel.comps.length}개. ${S.mode === 'transit' ? '식현상은 5개 이상' : '변광성은 3~5개'}를 권합니다. 3개 이상이면 5단계에서 불안정한 비교성을 자동으로 걸러낼 수 있습니다.` });
+    return out;
+  }
+  function renderSelection() {
+    const t = S.sel.target, el = $('selInfo');
+    if (!el) return;
+    const chip = (cls, label, s) => `<span class="chip ${cls}">${label} (${fx(s.x, 1)}, ${fx(s.y, 1)})${s.id != null ? ' · ' + s.id + '번' : ''}</span>`;
+    el.innerHTML = `<div class="chips">${t ? chip('t', '대상', t) : '<span class="chip">대상 미정</span>'}${S.sel.comps.map((c, i) => chip('c', 'C' + (i + 1), c)).join('')}</div>${msgList(selectionWarnings())}`;
+  }
+  $('run3').addEventListener('click', () => {
+    if (!S.sel.target || !S.sel.comps.length) { renderSelection(); return; }
+    setState(3, 'done');
+    setState(4, 'ready');
+    lockFrom(5);
+    $('o4').innerHTML = `<p class="placeholder">대상 1개와 비교성 ${S.sel.comps.length}개로 측광할 준비가 됐습니다. "측광 시작"을 누르세요. 사진 ${S.frames.length}장을 차례로 엽니다.</p>`;
+  });
+
+  // ---------- step 4: photometry ----------
+  $('stop4').addEventListener('click', () => { S.stop = true; });
+  $('run4').addEventListener('click', async () => {
+    setState(4, 'running');
+    lockFrom(5);
+    $('c3').disabled = true;
+    S.stop = false;
+    $('stop4').disabled = false;
+    const gain = +$('gain').value > 0 ? +$('gain').value : 1;
+    const align = $('alignOn').checked;
+    const aligner = align ? C.makeAligner(S.refImg, S.stars, 14) : null;
+    $('o4').innerHTML = `<p class="log" id="phLog">준비 중…</p><progress id="phBar" max="${S.frames.length}" value="0"></progress>`;
+    const t0 = performance.now();
+    const rec = await C.runPhotometry({
+      count: S.frames.length, meta: S.frames, loadFrame, aligner, detectOpt: S.detectOpt, gain, maxShift: 6,
+      targetXY: [S.sel.target.x, S.sel.target.y], compXY: S.sel.comps.map(c => [c.x, c.y]),
+      shouldStop: () => S.stop,
+      onProgress: (k, n, fr) => {
+        const el = performance.now() - t0, eta = el / k * (n - k) / 1000;
+        $('phBar').value = k;
+        $('phLog').textContent = `${k} / ${n}장 측광 · ${fr ? esc(fr.name.split('/').pop()) : ''} · 남은 시간 약 ${eta < 90 ? Math.round(eta) + '초' : Math.round(eta / 60) + '분'}`;
+      },
+    });
+    $('stop4').disabled = true;
+    $('c3').disabled = false;
+    S.rec = rec;
+    S.alignOn = !!aligner;
+    S.alignRequested = align;
+    S.elapsed = (performance.now() - t0) / 1000;
+    const good = rec.frames.filter(f => !f.error);
+    if (good.length < 3) {
+      setState(4, 'ready');
+      $('o4').innerHTML = msgList([{ k: 'bad', t: `측광된 사진이 ${good.length}장뿐이라 다음 단계로 갈 수 없습니다.${rec.stopped ? ' (중간에 멈췄습니다)' : ''}` }]);
+      return;
+    }
+    S.use = S.sel.comps.map(() => true);
+    renderStep4();
+    setState(4, 'done');
+    setState(5, 'ready');
+  });
+  function renderStep4() {
+    const rec = S.rec, good = rec.frames.filter(f => !f.error), bad = rec.frames.filter(f => f.error);
+    const t0 = good[0].jdMid, h = good.map(f => (f.jdMid - t0) * 24);
+    const failed = good.filter(f => f.alignFailed).length, rot = good.map(f => f.rot), shiftC = good.map(f => f.shiftC);
+    const maxMove = Math.max(...good.map(f => f.move[0]));
+    const msgs = [];
+    if (S.alignRequested && !S.alignOn) msgs.push({ k: 'warn', t: '정렬에 쓸 밝고 고립된 별이 부족해 시야 정렬 없이 측광했습니다. 2단계에서 탐지 기준을 낮춰 별을 더 찾아보세요.' });
+    if (failed) msgs.push({ k: 'warn', t: `정렬에 실패한 사진 ${failed}장은 바로 앞 사진의 정렬 값을 그대로 썼습니다.` });
+    if (bad.length) msgs.push({ k: 'bad', t: `열지 못한 사진 ${bad.length}장: ${esc(bad.slice(0, 3).map(f => f.name + ' (' + f.error + ')').join(', '))}` });
+    if (rec.stopped) msgs.push({ k: 'warn', t: `중간에 멈춰서 ${good.length}장까지만 측광했습니다.` });
+    if (S.alignOn && maxMove > 6) msgs.push({ k: 'ok', t: `대상 별이 밤새 처음 자리에서 최대 ${fx(maxMove, 1)}픽셀 움직였고, 시야 정렬이 그만큼 측광 원을 옮겨 따라갔습니다. 정렬이 없었다면 별이 측광 원 밖으로 빠져 어두워진 것처럼 측정됐을 것입니다.` });
+    $('o4').innerHTML = `${kvs([[good.length + '장', '측광한 사진'], [fx(S.elapsed, 0) + ' 초', '걸린 시간'], [S.alignOn ? `${fs(Math.min(...rot), 2)} ~ ${fs(Math.max(...rot), 2)}°` : '정렬 끔', '시야 회전 (첫 사진 대비)'], [S.alignOn ? fx(Math.max(...shiftC), 1) + ' px' : '–', '시야 중심 이동 (최대)'], [fx(maxMove, 1) + ' px', '대상 별 이동 (최대)']])}${msgList(msgs)}<div class="grid2" id="g4"></div>`;
+    if (S.alignOn) {
+      const a = chartBox(), b = chartBox();
+      $('g4').append(a, b);
+      chart(a, { title: '시야 회전각', width: 480, height: 300, xLabel: '첫 사진 이후 시간 (시간)', yLabel: '회전 (도)', series: [{ kind: 'line', x: h, y: rot, color: MPL.C0 }], hover: { x: h, y: rot, text: i => `${fx(h[i], 2)} h · ${fs(rot[i], 3)}°` } });
+      chart(b, { title: '시야 중심 이동', width: 480, height: 300, xLabel: '첫 사진 이후 시간 (시간)', yLabel: '이동 (픽셀)', series: [{ kind: 'line', x: h, y: shiftC, color: MPL.C1 }], hover: { x: h, y: shiftC, text: i => `${fx(h[i], 2)} h · ${fx(shiftC[i], 1)} px` } });
+    }
+  }
+
+  // ---------- step 5: vet + radius ----------
+  $('run5').addEventListener('click', () => {
+    setState(5, 'running');
+    const nComp = S.sel.comps.length, R0 = C.RADII.indexOf(12);
+    const vet0 = C.vetComps(C.buildSeries(S.rec, R0, S.sel.comps.map(() => true)), nComp);
+    S.use = vet0.enough ? vet0.flags.map(f => !f) : S.sel.comps.map(() => true);
+    if (S.use.filter(Boolean).length < 2) S.use = S.sel.comps.map(() => true);
+    S.scores = C.RADII.map((_, r) => C.compScatter(S.rec, r, S.use));
+    S.radOk = allowedRadii();
+    const fin = S.scores.map((s, i) => [s, i]).filter(p => Number.isFinite(p[0]) && S.radOk.ok[p[1]]);
+    S.rIdx = fin.length ? fin.sort((a, b) => a[0] - b[0])[0][1] : 0;
+    S.recR = S.rIdx;
+    renderStep5();
+    setState(5, 'done');
+    setState(6, 'ready');
+    if (stateOf(6) === 'ready') $('o6').innerHTML = '<p class="placeholder">"광도곡선 그리기"를 누르세요.</p>';
+  });
+  function allowedRadii() {
+    const t = S.sel.target, pool = S.stars.all || S.stars, tf = t.flux > 0 ? t.flux : 1;
+    let dNb = Infinity;
+    for (const s of pool) {
+      const d = Math.hypot(s.x - t.x, s.y - t.y);
+      if (d > 3 && s.flux > 0.05 * tf && d < dNb) dNb = d;
+    }
+    const ok = C.RADII.map(r => r + C.ANN_GAP + C.ANN_WIDTH <= dNb - 2);
+    return { ok, dNb, none: !ok.some(Boolean) };
+  }
+  function renderStep5() {
+    const nComp = S.sel.comps.length, rows = C.buildSeries(S.rec, S.rIdx, S.sel.comps.map(() => true));
+    const vet = C.vetComps(rows, nComp);
+    S.vet = vet;
+    const r = C.RADII[S.rIdx], t0 = rows[0].jd;
+    const msgs = [];
+    if (!vet.enough) msgs.push({ k: '', t: '비교성이 3개 미만이라 자동 점검은 하지 않았습니다. 서로 비교할 별이 부족해서, 어느 쪽이 흔들리는지 가려낼 수 없기 때문입니다.' });
+    else {
+      const ex = vet.flags.map((f, j) => (f ? `C${j + 1}` : null)).filter(Boolean);
+      msgs.push(ex.length ? { k: 'warn', t: `${ex.join(', ')}은 다른 비교성보다 유난히 흔들려서(기준 ${fx(vet.limit * 1000, 1)} mmag) 처음에 자동으로 뺐습니다. 체크를 바꿔 넣고 뺄 수 있습니다.` } : { k: 'ok', t: `모든 비교성이 기준(${fx(vet.limit * 1000, 1)} mmag) 안에서 안정적입니다.` });
+    }
+    if (S.use.filter(Boolean).length < 1) msgs.push({ k: 'bad', t: '사용하는 비교성이 하나도 없습니다. 최소 1개는 체크하세요.' });
+    const ro = S.radOk;
+    if (ro.none) msgs.push({ k: 'warn', t: `대상에서 ${fx(ro.dNb, 0)}픽셀 떨어진 곳에 밝은 별이 붙어 있어, 어떤 크기를 써도 배경환이 그 별에 닿습니다. 가장 작은 측광 원을 추천합니다. 이 별빛이 섞여 결과가 흔들릴 수 있으니 해석에 주의하세요.` });
+    else if (ro.ok.some(v => !v)) msgs.push({ k: '', t: `대상에서 ${fx(ro.dNb, 0)}픽셀 떨어진 곳에 밝은 별이 있습니다. 배경환(측광 원 + ${C.ANN_GAP + C.ANN_WIDTH}픽셀)이 그 별에 닿지 않는 ${C.RADII.filter((_, i) => ro.ok[i]).pop()}픽셀 이하 중에서 추천했습니다. 더 크게 고르면 이웃 별빛이 섞입니다.` });
+    $('o5').innerHTML = `
+      <div class="controls" style="padding:0"><label class="field"><span>측광 원 반지름</span><select id="radSel">${C.RADII.map((rr, i) => `<option value="${i}"${i === S.rIdx ? ' selected' : ''}>${rr} 픽셀${i === S.recR ? ' (추천)' : ''}${ro.ok[i] ? '' : ' · 이웃 별과 겹침'}</option>`).join('')}</select></label>
+      <p class="log">배경환: ${r + C.ANN_GAP} ~ ${r + C.ANN_GAP + C.ANN_WIDTH} 픽셀 · 별 크기 FWHM 약 ${fx(S.fwhm, 1)} 픽셀</p></div>
+      ${msgList(msgs)}
+      <div class="tablewrap"><table><thead><tr><th>사용</th><th>비교성</th><th class="n">x</th><th class="n">y</th><th class="n">흔들림 (mmag)</th><th>판정</th></tr></thead><tbody>
+      ${S.sel.comps.map((c, j) => `<tr><td><input type="checkbox" data-use="${j}"${S.use[j] ? ' checked' : ''} aria-label="C${j + 1} 사용"></td><td>C${j + 1}${c.id != null ? ' · ' + c.id + '번' : ''}</td><td class="n">${fx(c.x, 1)}</td><td class="n">${fx(c.y, 1)}</td><td class="n">${Number.isFinite(vet.stds[j]) ? fx(vet.stds[j] * 1000, 1) : '–'}</td><td>${!vet.enough ? '<span class="tag">점검 안 함</span>' : vet.flags[j] ? '<span class="tag bad">불안정</span>' : '<span class="tag ok">안정</span>'}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="minis" id="mini5"></div>
+      <div class="chart" id="rad5"></div>`;
+    $('radSel').addEventListener('change', e => { S.rIdx = +e.target.value; renderStep5(); refreshDown(); });
+    $('o5').querySelectorAll('[data-use]').forEach(cb => cb.addEventListener('change', () => {
+      S.use[+cb.dataset.use] = cb.checked;
+      S.scores = C.RADII.map((_, rr) => C.compScatter(S.rec, rr, S.use));
+      renderStep5();
+      refreshDown();
+    }));
+    if (vet.enough) {
+      const hours = rows.filter(rw => rw.cm.every(Number.isFinite)).map(rw => (rw.jd - t0) * 24);
+      vet.series.forEach((s, j) => {
+        const box = chartBox();
+        $('mini5').append(box);
+        const med = C.median(s), y = s.map(v => (v - med) * 1000);
+        chart(box, { title: `C${j + 1} − 나머지 중앙값 · ${fx(vet.stds[j] * 1000, 1)} mmag${vet.flags[j] ? ' · 불안정' : ''}`, small: true, width: 360, height: 230, xTicks: 4, xLabel: '시간 (시간)', yLabel: 'mmag', invertY: true, series: [{ kind: 'dots', x: hours, y, color: vet.flags[j] ? MPL.C3 : MPL.C0, alpha: 0.6, r: 1.9 }] });
+      });
+    }
+    const sc = S.scores.map(v => v * 1000);
+    chart($('rad5'), {
+      title: '측광 원 크기별 비교성끼리의 흩어짐 (10분 묶음, 작을수록 좋음)', width: 760, height: 300, xLabel: '측광 원 반지름 (픽셀)', yLabel: '흩어짐 (mmag)',
+      series: [{ kind: 'line', x: C.RADII, y: sc, color: MPL.C0 }, { kind: 'dots', x: C.RADII, y: sc, color: MPL.C0, r: 3.6 }],
+      marks: Number.isFinite(sc[S.recR]) ? [{ x: C.RADII[S.recR], y: sc[S.recR], label: '추천' }] : [],
+      hover: { x: C.RADII, y: sc, text: i => `${C.RADII[i]} px · ${fx(sc[i], 2)} mmag` },
+    });
+  }
+
+  // ---------- step 6: light curve ----------
+  function currentRows() {
+    const rows = C.buildSeries(S.rec, S.rIdx, S.use);
+    const errs = rows.map(r => r.derr).filter(Number.isFinite);
+    const thr = Math.max(5 * C.median(errs), 0.02), kept = [], dropped = [];
+    for (const r of rows) {
+      const reasons = [];
+      if (!Number.isFinite(r.diff)) reasons.push('측광 실패');
+      else if ($('outlierOn').checked) {
+        if (r.shiftMax > 6) reasons.push(`별 위치 어긋남 ${fx(r.shiftMax, 1)}px`);
+        if (r.derr > thr) reasons.push(`오차 큼 ${fx(r.derr * 1000, 1)}mmag`);
+      }
+      (reasons.length ? dropped : kept).push(Object.assign(r, { reasons }));
+    }
+    return { kept, dropped, thr };
+  }
+  ['binMin', 'outlierOn', 'detrendOn', 'detrendBy', 'yUnit'].forEach(id => $(id).addEventListener('change', () => { if (stateOf(6) === 'done') { renderStep6(); if (stateOf(7) === 'done') renderStep7(); if (stateOf(8) === 'done') renderStep8(); } }));
+  $('run6').addEventListener('click', () => {
+    renderStep6();
+    setState(6, 'done');
+    if (stateOf(7) !== 'done') { setState(7, 'ready'); $('o7').innerHTML = '<p class="placeholder">궤도 정보를 확인하고 "피팅 실행"을 누르세요.</p>'; }
+    if (stateOf(8) === 'done') renderStep8();
+    else { setState(8, 'ready'); $('o8').innerHTML = '<p class="placeholder">"결과 정리"를 누르세요. 7단계 피팅을 먼저 하면 식 안·밖을 나눠 계산합니다.</p>'; }
+  });
+  function refreshDown() { if (stateOf(6) === 'done') renderStep6(); if (stateOf(7) === 'done') renderStep7(); if (stateOf(8) === 'done') renderStep8(); }
+  function renderStep6() {
+    const { kept, dropped } = currentRows();
+    S.kept = kept;
+    if (kept.length < 3) { $('o6').innerHTML = msgList([{ k: 'bad', t: '그릴 수 있는 사진이 3장보다 적습니다. 5단계에서 비교성을 확인하세요.' }]); return; }
+    const t0 = kept[0].jd, h = kept.map(r => (r.jd - t0) * 24), jd = kept.map(r => r.jd);
+    let d = kept.map(r => r.diff);
+    const airOk = kept.filter(r => Number.isFinite(r.airmass)).length > 0.9 * kept.length;
+    const by = $('detrendBy').value === 'airmass' && airOk ? 'airmass' : 'time';
+    if ($('detrendOn').checked) d = C.detrendLinear(by === 'airmass' ? kept.map(r => r.airmass) : h, d);
+    const flux = $('yUnit').value === 'flux';
+    const level = C.median(d), y = d.map(v => (flux ? Math.pow(10, -0.4 * (v - level)) : (v - level) * 1000));
+    const binMin = +$('binMin').value;
+    const b = binMin > 0 ? C.binSeries(jd, y, binMin) : null;
+    const bh = b ? b.t.map(t => (t - t0) * 24) : [];
+    const scat10 = C.binnedScatter(jd, d, 10) * 1000, p2p = C.p2p(d) * 1000;
+    const val = v => (flux ? v.toFixed(4) : `${fs(v, 1)} mmag`), errTxt = v => (flux ? v.toFixed(4) : fx(v, 1));
+    const msgs = [];
+    if (flux && S.mode === 'transit') msgs.push({ k: '', t: '여기서 1.00은 관측 전체의 중앙값 밝기입니다. 식이 관측 시간 대부분을 차지하면 평소 밝기보다 조금 낮게 잡힙니다. 식 밖(평소) 밝기를 1.00으로 맞춘 그래프는 7단계에서 볼 수 있습니다.' });
+    if (dropped.length) msgs.push({ k: 'warn', t: `뺀 사진 ${dropped.length}장 — ${esc(dropped.slice(0, 4).map(r => `${r.fr.name.split('/').pop()}: ${r.reasons.join(', ')}`).join(' / '))}${dropped.length > 4 ? ' …' : ''}` });
+    if ($('detrendOn').checked) msgs.push({ k: S.mode === 'transit' ? 'warn' : '', t: `${by === 'airmass' ? '대기질량' : '시간'}에 대한 직선 추세를 뺐습니다.${S.mode === 'transit' ? ' 식이 관측 시간 대부분을 차지하면 식 신호까지 줄어들 수 있습니다.' : ''}${$('detrendBy').value === 'airmass' && !airOk ? ' (대기질량 정보가 없어 시간 기준으로 뺐습니다)' : ''}` });
+    msgs.push({ k: '', t: `오차막대는 묶음 안 사진들의 흩어짐으로 계산했습니다. 사진 한 장의 오차(광자 잡음 ${fx(C.median(kept.map(r => r.derr)) * 1000, 1)} mmag)보다 실제 흔들림(${fx(p2p, 1)} mmag)이 크면, 구름·시상 같은 다른 잡음이 섞여 있다는 뜻입니다.` });
+    const rawMed = C.median(kept.map(r => r.diff));
+    const csv = ['file,jd_utc_mid,airmass,diff_mag,diff_mag_err,rel_flux,rel_flux_err,target_mag,comp_mag,rot_deg'].concat(kept.map(r => {
+      const rf = Math.pow(10, -0.4 * (r.diff - rawMed));
+      return [r.fr.name, r.jd.toFixed(6), fx(r.airmass, 4), r.diff.toFixed(5), r.derr.toFixed(5), rf.toFixed(6), (rf * 0.921 * r.derr).toFixed(6), r.tmag.toFixed(5), r.cmag.toFixed(5), fx(r.fr.rot, 4)].join(',');
+    })).join('\n');
+    $('o6').innerHTML = `${kvs([[`${kept.length}장`, `그린 사진 (뺀 사진 ${dropped.length}장)`], [fx(level, 3), '차등 등급 평균 (등급)'], [`${fx(p2p, 1)} mmag (${fx(p2p * 0.0921, 2)}%)`, '연속된 사진 사이 흔들림'], [Number.isFinite(scat10) ? `${fx(scat10, 1)} mmag (${fx(scat10 * 0.0921, 2)}%)` : '–', '10분 묶음 흩어짐 (진짜 변화 포함)'], [`${C.RADII[S.rIdx]} px · 비교성 ${S.use.filter(Boolean).length}개`, '측광 원 · 비교성']])}
+      <div class="chart" id="lc6"></div>${msgList(msgs)}
+      <details><summary>결과 표 (CSV) 복사하기</summary><div class="controls" style="padding:10px 0 0"><button class="btn" type="button" id="copyCsv">CSV 복사</button><span class="log" id="copyMsg"></span><textarea id="csvOut" rows="6" readonly>${esc(csv)}</textarea></div></details>`;
+    const series = [{ kind: 'dots', x: h, y, color: MPL.C0, alpha: b ? 0.35 : 0.75, r: 2.4, label: '사진 한 장' }];
+    if (b) series.push({ kind: 'bins', x: bh, y: b.y, e: b.e, color: MPL.C1, label: `${binMin}분 묶음 평균 ± 오차` });
+    chart($('lc6'), {
+      title: flux ? '차등 광도곡선 (1.00 = 관측 전체의 중앙값 밝기)' : `차등 광도곡선 (평균 ${fx(level, 3)}등급 기준)`, width: 760, height: 380, invertY: !flux,
+      xLabel: '첫 사진 이후 시간 (시간)', series,
+      yLabel: flux ? `정규화 상대 플럭스 (대상 / 비교성${$('detrendOn').checked ? ', 추세 제거' : ''})` : '밝기 변화 (mmag, 위쪽이 밝음)',
+      hover: b ? { x: bh, y: b.y, text: i => `${fx(bh[i], 2)} h · ${val(b.y[i])} ± ${errTxt(b.e[i])} (${b.n[i]}장)` } : { x: h, y, text: i => `${fx(h[i], 2)} h · ${val(y[i])}` },
+    });
+    $('copyCsv').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(csv); $('copyMsg').textContent = '복사했습니다. 엑셀이나 메모장에 붙여 넣으세요.'; }
+      catch { $('csvOut').select(); $('copyMsg').textContent = '자동 복사가 막혀 있어 표를 선택해 두었습니다. Ctrl+C로 복사하세요.'; }
+    });
+  }
+
+
+  // ---------- step 8: statistics + CSV ----------
+  let downloadsNs = null;
+  if (window.claude && typeof window.claude.use === 'function') window.claude.use('downloads').then(ns => { downloadsNs = ns; }).catch(() => {});
+  async function offerCsv(filename, text, statusEl, fallbackEl) {
+    const data = '\uFEFF' + text;
+    if (downloadsNs) {
+      try { await downloadsNs.save({ filename, data }); statusEl.textContent = `${filename} 저장을 요청했습니다.`; return; }
+      catch (e) {
+        const code = e && e.code;
+        if (code === 'declined') { statusEl.textContent = '저장을 취소했습니다.'; return; }
+        if (code === 'rate_limited') { statusEl.textContent = '저장 창이 이미 열려 있습니다. 잠시 후 다시 눌러 주세요.'; return; }
+      }
+    }
+    if (!window.claude) {
+      const url = URL.createObjectURL(new Blob([data], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      statusEl.textContent = `${filename} 다운로드했습니다.`;
+      return;
+    }
+    fallbackEl.value = text; fallbackEl.hidden = false; fallbackEl.select();
+    statusEl.textContent = '이 화면에서는 파일 저장이 막혀 있어 아래 칸에 표를 띄웠습니다. Ctrl+C로 복사해 엑셀이나 메모장에 붙여 넣으세요.';
+  }
+  async function copyText(text, statusEl, fallbackEl) {
+    try { await navigator.clipboard.writeText(text); statusEl.textContent = '복사했습니다. 엑셀이나 메모장에 붙여 넣으세요.'; }
+    catch { fallbackEl.value = text; fallbackEl.hidden = false; fallbackEl.select(); statusEl.textContent = '자동 복사가 막혀 있어 아래 칸에 표를 띄웠습니다. Ctrl+C로 복사하세요.'; }
+  }
+  const csvCell = v => { const t = v == null ? '' : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const csvLine = arr => arr.map(csvCell).join(',');
+  const nf = (v, dg) => (Number.isFinite(v) ? v.toFixed(dg) : '');
+  const sampleStd = a => {
+    const f = a.filter(Number.isFinite);
+    if (f.length < 2) return NaN;
+    const m = f.reduce((t, v) => t + v, 0) / f.length;
+    return Math.sqrt(f.reduce((t, v) => t + (v - m) * (v - m), 0) / (f.length - 1));
+  };
+  function timeBins(jd, values, widthMin) {
+    const j0 = Math.min(...jd), groups = new Map();
+    jd.forEach((t, i) => { if (!Number.isFinite(values[i])) return; const g = Math.floor((t - j0) / (widthMin / 1440)); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(i); });
+    return [...groups.keys()].sort((a, b) => a - b).map(g => {
+      const idx = groups.get(g), v = idx.map(i => values[i]), m = v.reduce((t, x) => t + x, 0) / v.length, sd = sampleStd(v);
+      return { idx, jd: idx.reduce((t, i) => t + jd[i], 0) / idx.length, n: idx.length, mean: m, sd, sem: sd / Math.sqrt(idx.length) };
+    });
+  }
+  $('run8').addEventListener('click', () => { renderStep8(); setState(8, 'done'); });
+  function renderStep8() {
+    const { kept, dropped } = currentRows();
+    if (kept.length < 3) { $('o8').innerHTML = msgList([{ k: 'bad', t: '정리할 사진이 3장보다 적습니다.' }]); return; }
+    let fi = stateOf(7) === 'done' ? S.fitInfo : null;
+    if (fi && (fi.names.length !== kept.length || fi.names[0] !== kept[0].fr.name || fi.names[fi.names.length - 1] !== kept[kept.length - 1].fr.name)) fi = null;
+    const d = kept.map(r => r.diff), jd = kept.map(r => r.jd), t0 = jd[0], hours = jd.map(t => (t - t0) * 24);
+    const ra = C.parseRA($('fRa').value), dec = C.parseDec($('fDec').value), hasCoord = Number.isFinite(ra) && Number.isFinite(dec);
+    const med = C.median(d);
+    const base = fi ? fi.base : d.map(() => med);
+    const rel = d.map((v, i) => Math.pow(10, -0.4 * (v - base[i])));
+    const relErr = rel.map((f, i) => f * 0.921 * kept[i].derr);
+    const resid = fi ? d.map((v, i) => (v - fi.modelMag[i]) * 1000) : null;
+    const modelRel = fi ? fi.modelMag.map((m, i) => Math.pow(10, -0.4 * (m - fi.base[i]))) : null;
+    const pc = v => v * 0.0921;
+
+    const sdAll = sampleStd(d) * 1000, p2p = C.p2p(d) * 1000, expSd = C.median(kept.map(r => r.derr)) * 1000;
+    const outIdx = fi ? kept.map((_, i) => i).filter(i => !fi.inT[i]) : [];
+    const inIdx = fi ? kept.map((_, i) => i).filter(i => fi.inT[i]) : [];
+    const sdOut = fi && outIdx.length > 2 ? sampleStd(outIdx.map(i => resid[i])) : NaN;
+    const sdIn = fi && inIdx.length > 2 ? sampleStd(inIdx.map(i => resid[i])) : NaN;
+    const sdRes = fi ? sampleStd(resid) : NaN;
+    const binVals = fi ? resid : C.detrendLinear(hours, d).map(v => v * 1000);
+    const bins10 = timeBins(jd, binVals, 10).filter(b => b.n >= 3);
+    const sdBin = sampleStd(bins10.map(b => b.mean));
+    const vet = C.vetComps(C.buildSeries(S.rec, S.rIdx, S.sel.comps.map(() => true)), S.sel.comps.length);
+    const usedComps = S.use.map((u, j) => (u ? j : -1)).filter(j => j >= 0);
+
+    const items = [];
+    const add = (label, value, unit, note) => items.push({ label, value, unit, note });
+    add('사용한 사진 수', String(kept.length), '장', `이상한 사진 ${dropped.length}장은 뺐습니다.`);
+    add('관측 길이', nf(hours[hours.length - 1], 2), '시간', `${C.jdToUTC(kept[0].jd).date} ${C.jdToUTC(kept[0].jd).time} UTC부터`);
+    add('측광 원 반지름', String(C.RADII[S.rIdx]), '픽셀', `배경환 ${C.RADII[S.rIdx] + C.ANN_GAP}~${C.RADII[S.rIdx] + C.ANN_GAP + C.ANN_WIDTH} 픽셀`);
+    add('사용한 비교성 수', String(usedComps.length), '개', usedComps.map(j => 'C' + (j + 1)).join(', '));
+    add('차등 등급 중앙값', nf(med, 4), '등급', '대상 등급 − 비교성 등급');
+    add('전체 표준편차 (진짜 변화 포함)', nf(sdAll, 2), 'mmag', `≈ ${nf(pc(sdAll), 3)}%. 식이나 변광 같은 실제 변화까지 섞인 값입니다.`);
+    add('연속된 사진 사이 흔들림', nf(p2p, 2), 'mmag', `≈ ${nf(pc(p2p), 3)}%. 이웃한 사진끼리의 차이로 잰 사진 한 장의 잡음입니다.`);
+    add('예상 잡음 (광자·배경)', nf(expSd, 2), 'mmag', `실제 흔들림이 예상의 ${nf(p2p / expSd, 1)}배입니다. 1보다 크면 구름·시상 같은 다른 잡음이 섞인 것입니다.`);
+    add(`10분 묶음 표준편차${fi ? ' (모델 대비)' : ' (직선 추세 뺀 값)'}`, nf(sdBin, 2), 'mmag', `≈ ${nf(pc(sdBin), 3)}%. 10분씩 평균한 값들의 흩어짐입니다.`);
+    if (fi) {
+      add('식 밖 표준편차 (측정 정밀도)', nf(sdOut, 2), 'mmag', `≈ ${nf(pc(sdOut), 3)}%. 식 밖 사진 ${outIdx.length}장 기준${outIdx.length < 20 ? ' (사진이 적어 불확실)' : ''}.`);
+      add('식 밖 평균의 표준오차 (σ/√N)', nf(sdOut / Math.sqrt(outIdx.length), 2), 'mmag', '식 밖 기준 밝기를 얼마나 정확히 알았는지');
+      add('식 안 표준편차 (모델 대비)', nf(sdIn, 2), 'mmag', `식 안 사진 ${inIdx.length}장 기준`);
+      add('피팅 잔차 표준편차', nf(sdRes, 2), 'mmag', '데이터 − 모델의 흩어짐. 작을수록 모델이 잘 맞습니다.');
+      add('식 깊이', `${nf(fi.depth, 2)} ± ${nf(fi.err, 2)}`, 'mmag', `≈ ${nf((1 - Math.pow(10, -0.4 * fi.depth / 1000)) * 100, 3)} ± ${nf(pc(fi.err), 3)}% 감광 (${fi.ldMode ? '주연감광 모델, 식 중앙 기준' : '사다리꼴 모델'})`);
+      add('신호대잡음비 (깊이 ÷ 오차)', nf(fi.sn, 1), 'σ', fi.sn >= 3 ? '3 이상: 통계적으로 뚜렷함' : fi.sn >= 2 ? '2~3: 약한 신호' : '2 미만: 확인 어려움');
+      add('예상 식 깊이', nf(fi.expD, 2), 'mmag', '입력한 궤도·행성 정보로 계산한 값');
+      if (fi.ldMode && Number.isFinite(fi.kFit)) add('반지름 비 Rp/Rs', `${nf(fi.kFit, 4)} ± ${nf(fi.kErr, 4)}`, '', `입력값 ${nf(fi.kIn, 4)}`);
+      add('식 중앙 시각 (BJD_TDB)', nf(fi.tc, 5), '일', `추세: ${fi.trendName}`);
+    }
+    usedComps.forEach(j => add(`비교성 C${j + 1} 표준편차`, nf(vet.stds[j] * 1000, 2), 'mmag', '나머지 비교성 중앙값과 비교한 흩어짐'));
+
+    const all = kept.map((r, i) => ({ r, i, used: 1 })).concat(dropped.map(r => ({ r, i: -1, used: 0 }))).sort((a, b) => a.r.jd - b.r.jd);
+    const frameHead = ['file', 'utc', 'jd_utc_mid', 'bjd_tdb', 'hours_from_start', 'airmass', 'used', 'excluded_reason', 'diff_mag', 'diff_mag_err', 'rel_flux', 'rel_flux_err', 'model_rel_flux', 'residual_mmag', 'in_transit', 'target_mag', 'comp_mag', 'target_shift_px', 'field_rot_deg'];
+    const frameCsv = [csvLine(frameHead)].concat(all.map(({ r, i, used }) => {
+      const u = C.jdToUTC(r.jd), rf = i >= 0 ? rel[i] : Math.pow(10, -0.4 * (r.diff - med));
+      return csvLine([r.fr.name.split('/').pop(), `${u.date} ${u.time}`, nf(r.jd, 6), hasCoord ? nf(C.bjdTDB(r.jd, ra, dec), 6) : '', nf((r.jd - t0) * 24, 4), nf(r.airmass, 4), used, (r.reasons || []).join('; '),
+        nf(r.diff, 5), nf(r.derr, 5), nf(rf, 6), i >= 0 ? nf(relErr[i], 6) : '', fi && i >= 0 ? nf(modelRel[i], 6) : '', fi && i >= 0 ? nf(resid[i], 3) : '', fi && i >= 0 ? (fi.inT[i] ? 1 : 0) : '',
+        nf(r.tmag, 5), nf(r.cmag, 5), nf(r.fr.shift[0], 2), nf(r.fr.rot, 4)]);
+    })).join('\n');
+    const relBins = timeBins(jd, rel, 10).filter(b => b.n >= 2);
+    const binCsv = [csvLine(['hours_center', 'jd_utc_center', 'bjd_tdb_center', 'n_frames', 'rel_flux_mean', 'rel_flux_std', 'rel_flux_sem', 'residual_mmag_mean', 'residual_mmag_std'])].concat(relBins.map(b => {
+      const rv = fi ? b.idx.map(i => resid[i]) : [];
+      return csvLine([nf((b.jd - t0) * 24, 4), nf(b.jd, 6), hasCoord ? nf(C.bjdTDB(b.jd, ra, dec), 6) : '', b.n, nf(b.mean, 6), nf(b.sd, 6), nf(b.sem, 6), fi ? nf(rv.reduce((t, x) => t + x, 0) / rv.length, 3) : '', fi ? nf(sampleStd(rv), 3) : '']);
+    })).join('\n');
+    const sumCsv = [csvLine(['항목', '값', '단위', '설명'])].concat(items.map(it => csvLine([it.label, it.value, it.unit, it.note]))).join('\n');
+
+    const obj = (S.frames[0].object || '관측').replace(/[\\/:*?"<>|\s]+/g, '_'), day = C.jdToUTC(kept[0].jd).date;
+    const files = { frames: [`${obj}_${day}_프레임별결과.csv`, frameCsv], bins: [`${obj}_${day}_10분묶음.csv`, binCsv], summary: [`${obj}_${day}_요약통계.csv`, sumCsv] };
+    const tiles = [[`${nf(fi ? sdOut : p2p, 2)} mmag`, fi ? '식 밖 표준편차 (측정 정밀도)' : '사진 사이 흔들림'], [`${nf(pc(fi ? sdOut : p2p), 3)} %`, '같은 값을 %로'], [`${nf(sdBin, 2)} mmag`, '10분 묶음 표준편차']];
+    if (fi) tiles.push([`${nf(fi.depth, 1)} ± ${nf(fi.err, 1)}`, `식 깊이 mmag (${nf(fi.sn, 1)}σ)`]);
+    const msgs = [];
+    if (!fi) msgs.push({ k: '', t: '7단계 식 곡선 피팅을 먼저 실행하면 식 안·밖 표준편차, 식 깊이, 모델과 잔차까지 함께 정리합니다.' });
+    if (!hasCoord) msgs.push({ k: '', t: '7단계에 대상 좌표(RA, Dec)가 없어 BJD 열은 비워 두었습니다.' });
+    $('o8').innerHTML = `${kvs(tiles)}${msgList(msgs)}
+      <div class="tablewrap"><table><thead><tr><th>항목</th><th class="n">값</th><th>단위</th><th>설명</th></tr></thead><tbody>
+      ${items.map(it => `<tr><td>${esc(it.label)}</td><td class="n">${esc(it.value)}</td><td>${esc(it.unit)}</td><td style="white-space:normal">${esc(it.note)}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="tablewrap"><table><thead><tr><th>CSV 파일</th><th>내용</th><th></th></tr></thead><tbody>
+        <tr><td>프레임별 결과</td><td style="white-space:normal">사진 ${all.length}장 × ${frameHead.length}열: 시각, BJD, 대기질량, 차등 등급, 상대 플럭스와 오차${fi ? ', 모델, 잔차, 식 안/밖' : ''}, 뺀 사진과 이유</td><td><button class="btn" type="button" data-dl="frames">CSV 저장</button> <button class="mini-btn" type="button" data-cp="frames">복사</button></td></tr>
+        <tr><td>10분 묶음</td><td style="white-space:normal">묶음 ${relBins.length}개: 평균 상대 플럭스, 표준편차, 표준오차${fi ? ', 잔차' : ''}</td><td><button class="btn" type="button" data-dl="bins">CSV 저장</button> <button class="mini-btn" type="button" data-cp="bins">복사</button></td></tr>
+        <tr><td>요약 통계</td><td style="white-space:normal">위 표 ${items.length}개 항목 (항목, 값, 단위, 설명)</td><td><button class="btn" type="button" data-dl="summary">CSV 저장</button> <button class="mini-btn" type="button" data-cp="summary">복사</button></td></tr>
+      </tbody></table></div>
+      <p class="log" id="csvMsg"></p><textarea id="csvFallback" rows="6" readonly hidden></textarea>`;
+    $('o8').querySelectorAll('[data-dl]').forEach(btn => btn.addEventListener('click', () => { const [fn, txt] = files[btn.dataset.dl]; offerCsv(fn, txt, $('csvMsg'), $('csvFallback')); }));
+    $('o8').querySelectorAll('[data-cp]').forEach(btn => btn.addEventListener('click', () => copyText(files[btn.dataset.cp][1], $('csvMsg'), $('csvFallback'))));
+  }
+
+  // ---------- step 7: transit fit ----------
+  const LD = { B: [0.62, 0.20], V: [0.48, 0.26], R: [0.38, 0.29], I: [0.29, 0.29], g: [0.55, 0.22], r: [0.40, 0.29], i: [0.31, 0.29], clear: [0.42, 0.27] };
+  function setBand(band) {
+    $('fBand').value = band;
+    if (LD[band]) { $('fU1').value = LD[band][0].toFixed(2); $('fU2').value = LD[band][1].toFixed(2); }
+  }
+  function bandFromFilter(name) {
+    const t = String(name || '').trim();
+    const m = t.match(/(?:sdss|sloan)[_\s-]?([gri])/i);
+    if (m) return m[1].toLowerCase();
+    if (/^[BVRI]/.test(t)) return t[0];
+    if (/^[gri]/.test(t)) return t[0];
+    return 'clear';
+  }
+  $('fBand').addEventListener('change', e => setBand(e.target.value));
+  ['fU1', 'fU2'].forEach(id => $(id).addEventListener('input', () => { $('fBand').value = 'custom'; }));
+  $('presetHat').addEventListener('click', () => {
+    Object.entries({ fT0: '2456288.492023', fP: '4.46529962', fDur: '2.798', fIng: '0.51', fDepth: '15', fK: '0.118', fB: '0.75', fRa: '22h57m46.84s', fDec: '+38d40m29.8s' }).forEach(([k, v]) => { $(k).value = v; });
+    $('fModel').value = 'ld';
+  });
+  $('presetEx').addEventListener('click', () => {
+    const pl = (S.example || C.makeExample()).planet;
+    $('fT0').value = pl.T0.toFixed(6); $('fP').value = String(pl.P); $('fDur').value = String(pl.durH); $('fIng').value = String(pl.ingH); $('fDepth').value = pl.depthMmag.toFixed(1); $('fRa').value = pl.raText; $('fDec').value = pl.decText;
+    $('fK').value = String(pl.k); $('fB').value = String(pl.b); $('fModel').value = 'ld';
+    $('fBand').value = 'custom'; $('fU1').value = pl.u1.toFixed(2); $('fU2').value = pl.u2.toFixed(2);
+  });
+  $('run7').addEventListener('click', () => { renderStep7(); setState(7, 'done'); if (stateOf(8) === 'done') renderStep8(); });
+  function renderStep7() {
+    S.fitInfo = null;
+    const T0 = +$('fT0').value, P = +$('fP').value, dur = +$('fDur').value, ing = +$('fIng').value;
+    const ra = C.parseRA($('fRa').value), dec = C.parseDec($('fDec').value), trendKind = $('fTrend').value;
+    const ldMode = $('fModel').value === 'ld', kIn = +$('fK').value, bImp = +$('fB').value, u1 = +$('fU1').value, u2 = +$('fU2').value;
+    if (![T0, P, dur].every(Number.isFinite) || P <= 0 || dur <= 0) { $('o7').innerHTML = msgList([{ k: 'bad', t: '궤도 정보를 확인하세요. T0, 주기, 식 길이가 모두 숫자여야 합니다.' }]); return; }
+    if (!ldMode && !(ing > 0 && ing * 2 <= dur)) { $('o7').innerHTML = msgList([{ k: 'bad', t: '사다리꼴 모양에서는 들어가는 시간이 0보다 크고 식 길이의 절반보다 짧아야 합니다.' }]); return; }
+    if (ldMode && !(kIn > 0 && kIn < 0.5 && bImp >= 0 && bImp < 1 + kIn && Number.isFinite(u1) && Number.isFinite(u2))) { $('o7').innerHTML = msgList([{ k: 'bad', t: '주연감광 모델 값을 확인하세요. 반지름 비(Rp/Rs)는 0~0.5, 충돌 계수 b는 0 이상 (1 + Rp/Rs) 미만, u1·u2는 숫자여야 합니다.' }]); return; }
+    const shapeOf = (arr, t, k) => (ldMode ? C.ldShape(arr, t, P, dur, bImp, k, u1, u2).shape : C.transitShape(arr, t, dur, ing));
+    const expD = ldMode ? -2.5 * Math.log10(1 - C.ldShape([0], 0, P, dur, bImp, kIn, u1, u2).dmid) * 1000 : +$('fDepth').value;
+    const { kept } = currentRows();
+    if (kept.length < 10) { $('o7').innerHTML = msgList([{ k: 'bad', t: '피팅하기에 사진이 너무 적습니다.' }]); return; }
+    const bjd = kept.map(r => C.bjdTDB(r.jd, ra, dec)), d = kept.map(r => r.diff), t0b = bjd[0], hours = bjd.map(b => (b - t0b) * 24);
+    const airOk = kept.filter(r => Number.isFinite(r.airmass)).length > 0.9 * kept.length;
+    const trend = trendKind === 'none' ? null : trendKind === 'airmass' && airOk ? kept.map(r => r.airmass) : hours;
+    const trendName = trendKind === 'none' ? '없음' : trendKind === 'airmass' && airOk ? '대기질량' : '시간';
+    const midB = C.median(bjd), epoch = Math.round((midB - T0) / P);
+    let tc = T0 + epoch * P;
+    if ($('fFree').checked) {
+      let best = null;
+      for (let o = -60; o <= 60; o += 2) {
+        const tt = tc + o / 1440;
+        const shp = shapeOf(bjd, tt, kIn);
+        if (!shp.some(v => v > 0)) continue;
+        const f = C.fitWithShape(bjd, d, trend, shp, 10);
+        if (f && (!best || f.rmsFit < best.rms)) best = { tt, rms: f.rmsFit };
+      }
+      if (best) tc = best.tt;
+    }
+    const ct = ldMode ? C.contactTimesLD(tc, P, dur, bImp, kIn) : C.contactTimes(tc, dur, ing), off = bjd[0] - kept[0].jd;
+    const utc = b => (Number.isFinite(b) ? C.jdToUTC(b - off).hm : '–'), hr = b => (b - t0b) * 24;
+    const inside = b => b >= bjd[0] && b <= bjd[bjd.length - 1];
+    const pre = Math.max(0, (ct[0] - bjd[0]) * 1440), post = Math.max(0, (bjd[bjd.length - 1] - ct[3]) * 1440);
+    const msgs = [];
+    if (S.mode !== 'transit') msgs.push({ k: '', t: '1단계에서 "변광성"을 골랐습니다. 식현상이 아니라면 이 단계 결과는 참고만 하세요.' });
+    if (pre < 30 || post < 30) msgs.push({ k: 'warn', t: `식 전 평평한 구간 ${fx(pre, 0)}분, 식 후 ${fx(post, 0)}분. 둘 중 하나라도 30분보다 짧으면 추세와 식을 구분하기 어려워 깊이가 부정확해집니다. 다음 관측에서는 식 앞뒤로 1시간씩 더 찍으세요.` });
+    if ($('detrendOn').checked) msgs.push({ k: '', t: '6단계의 추세 제거와 상관없이, 여기서는 원래 값에 추세와 식을 함께 맞춥니다.' });
+    const timeTable = `<div class="tablewrap"><table><thead><tr><th>시점</th><th class="n">UTC</th><th class="n">첫 사진 기준</th><th>관측 여부</th></tr></thead><tbody>${[['식 시작 (T1)', ct[0]], ['완전히 들어감 (T2)', ct[1]], ['식 중앙', tc], ['나오기 시작 (T3)', ct[2]], ['식 끝 (T4)', ct[3]]].map(([n, b]) => `<tr><td>${n}</td><td class="n">${utc(b)}</td><td class="n">${Number.isFinite(b) ? fs(hr(b), 2) + ' 시간' : '–'}</td><td>${!Number.isFinite(b) ? '<span class="tag">스치는 식이라 없음</span>' : inside(b) ? '<span class="tag ok">관측 중</span>' : '<span class="tag">관측 밖</span>'}</td></tr>`).join('')}</tbody></table></div>`;
+    if (!shapeOf(bjd, tc, kIn).some(v => v > 0)) {
+      $('o7').innerHTML = `${timeTable}${msgList([{ k: 'bad', t: '예보된 식이 관측 시간 밖에 있습니다. 궤도 정보(T0, 주기)와 관측 날짜를 확인하세요.' }, ...msgs])}`;
+      return;
+    }
+    let kUse = kIn, shapeArr = shapeOf(bjd, tc, kUse);
+    let fit = C.fitWithShape(bjd, d, trend, shapeArr, 10);
+    if (ldMode && fit && fit.depth > 0) {
+      kUse = Math.min(0.45, Math.max(0.01, kIn * Math.sqrt(fit.depth * 1000 / expD)));
+      shapeArr = shapeOf(bjd, tc, kUse);
+      fit = C.fitWithShape(bjd, d, trend, shapeArr, 10) || fit;
+    }
+    if (!fit) { $('o7').innerHTML = `${timeTable}${msgList([{ k: 'bad', t: '피팅에 필요한 10분 묶음이 부족합니다. 관측 시간이 더 길어야 합니다.' }, ...msgs])}`; return; }
+    const depth = fit.depth * 1000, err = fit.err * 1000, sn = depth / err;
+    const cls = sn >= 3 ? 'ok' : sn >= 2 ? 'warn' : 'bad';
+    const verdict = sn >= 3 ? '식 신호가 통계적으로 뚜렷합니다.' : sn >= 2 ? '식이 있을 가능성이 있지만 약한 신호입니다. 확정하려면 더 좋은 데이터가 필요합니다.' : '이 데이터로는 식을 확인할 수 없습니다.';
+    const loo = [], used = S.use.map((u, j) => (u ? j : -1)).filter(j => j >= 0);
+    if (used.length >= 3) {
+      for (const j of used) {
+        const dj = kept.map(r => {
+          let sw = 0, sm = 0;
+          for (const k of used) if (k !== j && Number.isFinite(r.cm[k]) && r.ce[k] > 0) { const w = 1 / (r.ce[k] * r.ce[k]); sw += w; sm += w * r.cm[k]; }
+          return sw > 0 ? r.tmag - sm / sw : NaN;
+        });
+        const f = C.fitWithShape(bjd, dj, trend, shapeArr, 10);
+        loo.push({ j, depth: f ? f.depth * 1000 : NaN, err: f ? f.err * 1000 : NaN });
+      }
+    }
+    const spread = loo.length ? Math.max(...loo.map(l => l.depth)) - Math.min(...loo.map(l => l.depth)) : 0;
+    if (loo.length && spread > 2 * err) msgs.push({ k: 'warn', t: `비교성 구성에 따라 깊이가 ${fx(spread, 1)} mmag까지 달라집니다. 이 데이터의 식 깊이는 비교성 선택에 크게 좌우되므로 믿기 어렵습니다. 원하는 값이 나오는 조합을 골라 쓰면 안 되고, 비교성은 5단계의 안정성 기준으로만 고르세요.` });
+    const c = fit.coef, base = trend ? d.map((_, i) => c[0] + c[1] * trend[i]) : d.map(() => c[0]);
+    const flux = $('yUnit').value === 'flux';
+    const pct = mm => (1 - Math.pow(10, -0.4 * mm / 1000)) * 100, pctErr = mm => mm * 0.0921;
+    const toY = mag => (flux ? Math.pow(10, -0.4 * mag) : mag * 1000);
+    const resid = d.map((v, i) => toY(v - base[i]));
+    const b = C.binSeries(bjd, resid, 10), bh = b.t.map(t => (t - t0b) * 24);
+    const grid = Array.from({ length: 400 }, (_, i) => bjd[0] + (bjd[bjd.length - 1] - bjd[0]) * i / 399), gh = grid.map(hr);
+    const shFit = shapeOf(grid, tc, kUse), shExp = shapeOf(grid, tc, kIn);
+    const modelFit = mm => shFit.map(v => toY(v * mm / 1000)), modelExp = mm => shExp.map(v => toY(v * mm / 1000));
+    const kFit = ldMode && depth > 0 ? kIn * Math.sqrt(depth / expD) : NaN, kErr = kFit / 2 * err / depth;
+    S.fitInfo = { names: kept.map(r => r.fr.name), base, modelMag: d.map((_, i) => base[i] + c[c.length - 1] * shapeArr[i]), inT: shapeArr.map(v => v > 0), depth, err, sn, kFit, kErr, kIn, expD, tc, trendName, ldMode };
+    const big = flux ? `${fx(pct(depth), 2)} ± ${fx(pctErr(err), 2)} % 어두워짐` : `${fs(depth, 1)} ± ${fx(err, 1)} mmag`;
+    const small = flux ? `${fs(depth, 1)} ± ${fx(err, 1)} mmag` : `밝기 ${fx(pct(depth), 2)} ± ${fx(pctErr(err), 2)}% 감소`;
+    $('o7').innerHTML = `
+      <div class="verdict ${cls}"><span class="label">추세(${trendName}) + ${ldMode ? '주연감광 식 모델' : '사다리꼴 식 모델'}을 함께 맞춘 식 깊이${ldMode ? ' (가장 깊은 식 중앙 기준)' : ''}</span><b class="big">${big}</b><span>${small} · ${fx(sn, 1)}σ · 예상 깊이 약 ${fx(pct(expD), 2)}% (${fx(expD, 1)} mmag) · ${verdict}</span>${ldMode && Number.isFinite(kFit) ? `<span>반지름 비 Rp/Rs ≈ ${fx(kFit, 3)} ± ${fx(kErr, 3)} (입력값 ${fx(kIn, 3)}) · 행성 지름이 별 지름의 약 ${fx(kFit * 100, 1)}%</span>` : ''}</div>
+      ${timeTable}
+      <div class="chart" id="fit7"></div>
+      ${msgList(msgs)}
+      ${loo.length ? `<div class="tablewrap"><table><thead><tr><th>다시 맞출 때 뺀 비교성</th><th class="n">식 깊이 (mmag)</th><th class="n">밝기 감소 (%)</th></tr></thead><tbody>${loo.map(l => `<tr><td>C${l.j + 1}</td><td class="n">${fs(l.depth, 1)} ± ${fx(l.err, 1)}</td><td class="n">${fx(pct(l.depth), 2)} ± ${fx(pctErr(l.err), 2)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="log">비교성이 3개 이상이면 하나씩 빼고 다시 맞춘 결과도 보여 줍니다.</p>'}
+      <p class="log">10분 묶음 잔차: 식을 넣은 모델 ${fx(fit.rmsFit * 1000, 1)} mmag · 식 없는 모델 ${fx(fit.rmsFlat * 1000, 1)} mmag · 묶음 ${fit.nBins}개${$('fFree').checked ? ` · 식 중앙 시각을 예보보다 ${fs((tc - (T0 + epoch * P)) * 1440, 0)}분 옮겨 맞춤` : ''}</p>`;
+    chart($('fit7'), {
+      title: flux ? '추세를 뺀 상대 플럭스와 식 모델 (1.00 = 식 밖 평소 밝기)' : '추세를 뺀 밝기와 식 모델', width: 760, height: 400, invertY: !flux,
+      xLabel: '첫 사진 이후 시간 (시간)', yLabel: flux ? '정규화 상대 플럭스 (대상 / 비교성, 추세 제거)' : '밝기 변화 (mmag, 위쪽이 밝음)',
+      series: [
+        { kind: 'dots', x: hours, y: resid, color: MPL.gray, alpha: 0.4, r: 2.2, label: '사진 한 장 (추세 뺀 값)' },
+        { kind: 'bins', x: bh, y: b.y, e: b.e, color: MPL.C0, label: '10분 묶음 평균 ± 오차' },
+        { kind: 'line', x: gh, y: modelExp(expD), color: MPL.crimson, dash: '--', label: flux ? `예상 식 (깊이 ${fx(pct(expD), 2)}%)` : `예상 식 (${fx(expD, 1)} mmag)` },
+        { kind: 'line', x: gh, y: modelFit(depth), color: MPL.C0, lw: 2, label: flux ? `맞춘 식 (깊이 ${fx(pct(depth), 2)} ± ${fx(pctErr(err), 2)}%)` : `맞춘 식 (${fx(depth, 1)} ± ${fx(err, 1)} mmag)` },
+      ],
+      vlines: [['T1', ct[0]], ['T2', ct[1]], ['중앙', tc], ['T3', ct[2]], ['T4', ct[3]]].map(([l, x]) => ({ x: hr(x), label: l })),
+      vlineLabel: '예보된 접촉 시각',
+      hover: { x: bh, y: b.y, text: i => (flux ? `${fx(bh[i], 2)} h · ${b.y[i].toFixed(4)} ± ${b.e[i].toFixed(4)}` : `${fx(bh[i], 2)} h · ${fs(b.y[i], 1)} ± ${fx(b.e[i], 1)} mmag`) },
+    });
+  }
+})();
+</script>
+</body>
+</html>

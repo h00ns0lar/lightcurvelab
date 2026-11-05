@@ -1,0 +1,23 @@
+# Claude Code 설정 (개인용)
+.claude/
+
+# 관측 데이터: 용량이 커서 올리지 않습니다
+*.fit
+*.fits
+*.fts
+*.fz
+
+# 분석 결과물
+*.npy
+photometry_results*.csv
+preview_stars.png
+
+# Python / Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
